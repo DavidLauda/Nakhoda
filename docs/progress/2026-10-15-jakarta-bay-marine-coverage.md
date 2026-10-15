@@ -19,7 +19,9 @@ The 0.05° Marine grid originally used a bounding box that reached Jakarta Bay. 
 
 - Five focused Python tests passed, including Jakarta Bay water, mainland exclusion, and mismatch failure.
 - TypeScript typecheck and both Node tests passed.
-- Live Marine publication and visual map verification: pending.
+- `npm run lint` completed with zero errors (four existing warnings), and `npm run build` passed.
+- [Live Marine workflow run #5](https://github.com/DavidLauda/Nakhoda/actions/runs/38751717552) succeeded and published **145 distinct sea-condition cells** to Supabase. Its `discovery-metadata` artifact reported `state: available`, center coordinates spanning **106.425–107.025° E** and **-6.025–-5.425° N**, and all published cells carrying the coastline-mask quality flag. Cells near -6.025° N confirm the Jakarta Bay extension. SST acquisition was **14 October 2026 00:00 UTC**; chlorophyll-a acquisition was **13 October 2026 00:00 UTC**. The provider warned that the requested end time exceeded its newest available timestamp, with no fetch error.
+- Opened the fisherman quick-login flow and visually confirmed the rendered grid extends into Jakarta Bay while the conservation polygons remain farther north. [Map screenshot](assets/2026-10-15-jakarta-bay-map.png).
 
 ## Limitations
 
