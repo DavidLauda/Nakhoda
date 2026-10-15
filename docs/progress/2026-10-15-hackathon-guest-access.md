@@ -2,6 +2,8 @@
 
 **Tanggal:** 15 Oktober 2026 (WIB)
 
+**Status:** Digantikan oleh [Masuk Cepat dengan akses penuh](2026-10-15-quick-login-full-access.md). Catatan di bawah merekam implementasi sebelumnya.
+
 ## Progres
 
 - Halaman masuk kini mengutamakan tombol **Masuk sebagai tamu demo**. Pengunjung tidak perlu menyediakan alamat email atau kata sandi.
