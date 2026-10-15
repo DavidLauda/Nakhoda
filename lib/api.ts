@@ -56,8 +56,8 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
     return json({items,unavailableReason:items.length?'': 'Skor belum tersedia: SST dan klorofil-a yang cocok belum diproses.'});
   }
   if(path.join('/')==='data-health' && method==='GET') {
-    const q=await db.from('analysis_runs').select('*').order('started_at',{ascending:false}).limit(30);
-    if(user.role==='fisherman') return json({sources:(q.data||[]).map(x=>({source_name:x.source_name,status:x.status,latest_check_at:x.latest_check_at,latest_usable_observation_at:x.latest_usable_observation_at})),message:q.data?.length?'':'Belum ada pemeriksaan sumber yang dipublikasikan.'});
+    const q=await db.from('analysis_runs').select('id,source_name,status,latest_check_at,latest_usable_observation_at,error_code').order('started_at',{ascending:false}).limit(30);
+    if(user.portal==='fisherman') return json({sources:(q.data||[]).map(x=>({source_name:x.source_name,status:x.status,latest_check_at:x.latest_check_at,latest_usable_observation_at:x.latest_usable_observation_at})),message:q.data?.length?'':'Belum ada pemeriksaan sumber yang dipublikasikan.'});
     return json({runs:dataOrThrow(q.data,q.error,'Kesehatan data')});
   }
   if(path[0]==='trips') {

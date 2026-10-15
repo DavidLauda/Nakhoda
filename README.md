@@ -11,8 +11,8 @@ Email delivery, field reports, trip tracking, case review, and administration re
 
 1. Install Node.js 22+ and run `npm ci`. For the satellite pipeline, also install Python 3.12+ and `python -m pip install -r pipeline/requirements.txt`.
 2. Create a Supabase project, enable PostGIS, and apply `supabase/migrations/202610140001_initial.sql`.
-3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. The service-role key must remain server-side. Set `APP_BASE_URL` to the deployment URL.
-4. For hackathon quick entry, enable Supabase **Anonymous Sign-Ins** and set `NEXT_PUBLIC_QUICK_LOGIN_ENABLED=true` and `QUICK_LOGIN_FULL_ACCESS=true`. Run `npm run dev`, open `http://localhost:3000`, and choose **Masuk sebagai Nelayan** or **Masuk sebagai Pemerintah**. Each button creates an anonymous session with its own portal role. Sign out to switch portals. The government quick-entry role can read pilot source details, so use these flags only for a controlled judging environment.
+3. Copy `.env.example` to `.env.local` **on each computer running a clone**. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the project's **publishable** key (`sb_publishable_...`), and `SUPABASE_SERVICE_ROLE_KEY` to the server-only key. Never put `sb_secret_...` or a legacy service-role JWT in a `NEXT_PUBLIC_` variable. If a secret key was previously used in the browser, rotate it in Supabase. Set `APP_BASE_URL` to the deployment URL.
+4. Enable Supabase **Anonymous Sign-Ins** for that project. Run `npm run dev`, open `http://localhost:3000`, and choose **Masuk sebagai Nelayan** or **Masuk sebagai Pemerintah**. Quick login is the default on every clone; it needs no extra flags, email, or password. Each button creates an anonymous Supabase session and selects the corresponding portal. Sign out to switch portals. The government quick-entry portal can read pilot source health, but anonymous sessions do not gain case-review or administrator permissions.
 5. The map uses OpenStreetMap standard raster tiles by default with attribution. `NEXT_PUBLIC_MAP_STYLE_URL` can override the basemap with a licensed MapLibre style. Follow the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/) if using the default; tiles require an internet connection and are not bulk-cached by the PWA.
 
 ## Data and limits
@@ -25,6 +25,6 @@ The environmental index ranks conditions within available cells and is not a cat
 
 ## Checks and documentation
 
-Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm test`. Pipeline tests are `python -m pytest -q pipeline/tests` when Python dependencies are available. See [demo flow](docs/DEMO.md), [algorithm contract](docs/ALGORITHMS.md), [source notes](docs/SOURCES.md), [conservation map progress](docs/progress/2026-10-15-zone-visualization.md), and [Copernicus grid progress](docs/progress/2026-10-15-copernicus-grid-zoning.md).
+Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm test`. Pipeline tests are `python -m pytest -q pipeline/tests` when Python dependencies are available. See [demo flow](docs/DEMO.md), [quick-login setup for clones](docs/progress/2026-10-15-quick-login-for-all-clones.md), [algorithm contract](docs/ALGORITHMS.md), [source notes](docs/SOURCES.md), [conservation map progress](docs/progress/2026-10-15-zone-visualization.md), and [Copernicus grid progress](docs/progress/2026-10-15-copernicus-grid-zoning.md).
 
 Keep service-role, provider, and Gmail credentials out of chat, screenshots, client-side variables, and Git. Gmail configuration is optional for the current demo.

@@ -27,9 +27,9 @@ export async function identity(request: NextRequest): Promise<Identity> {
   if (error || !auth.user) throw new ApiError(401, 'invalid_session', 'Sesi tidak valid. Masuk kembali.');
   const { data, error: profileError } = await serviceDb().from('profiles').select('role,display_name').eq('id', auth.user.id).single();
   if (profileError || !data) throw new ApiError(403, 'missing_profile', 'Profil akun belum tersedia.');
-  const quickLogin = auth.user.is_anonymous === true && process.env.QUICK_LOGIN_FULL_ACCESS === 'true';
-  const portal = quickLogin && auth.user.user_metadata?.portal === 'government' ? 'government' : data.role === 'fisherman' ? 'fisherman' : 'government';
-  return { id: auth.user.id, role: quickLogin ? (portal === 'government' ? 'reviewer' : 'fisherman') : data.role as Role, displayName: quickLogin ? (portal === 'government' ? 'Akses Pemerintah' : 'Akses Nelayan') : data.display_name, isAnonymous: auth.user.is_anonymous === true, portal };
+  const quickLogin = auth.user.is_anonymous === true;
+  const portal = quickLogin ? (auth.user.user_metadata?.portal === 'government' ? 'government' : 'fisherman') : data.role === 'fisherman' ? 'fisherman' : 'government';
+  return { id: auth.user.id, role: quickLogin ? 'fisherman' : data.role as Role, displayName: quickLogin ? (portal === 'government' ? 'Akses Pemerintah' : 'Akses Nelayan') : data.display_name, isAnonymous: quickLogin, portal };
 }
 
 export async function reviewer(user: Identity, areaId: string) {
