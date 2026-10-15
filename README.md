@@ -1,6 +1,6 @@
 # Nakhoda
 
-Nakhoda is a Bahasa Indonesia hackathon PWA for a Kepulauan Seribu coastal pilot. It has two independent quick-entry flows:
+Nakhoda is a Bahasa Indonesia hackathon PWA for a Teluk Jakarta and Kepulauan Seribu coastal pilot. It has two independent quick-entry flows:
 
 - **Nelayan:** a real map, optional on-device GPS position, colored conservation reference polygons for the northern national park, and dated 0.05° SST/chlorophyll cells. The relative environmental index is experimental and does **not** prove fish abundance, safe passage, or permission to fish.
 - **Pemerintah:** an ecosystem dashboard summarizing published satellite and ocean data, source health, gaps, and evidence-based next steps. Heat-stress context and optical changes require field verification before any restoration claim.

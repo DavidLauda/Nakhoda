@@ -1,0 +1,32 @@
+{
+  "source": "Natural Earth 10m land polygons, version 5.1.1",
+  "source_url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_land.zip",
+  "source_zip_sha256": "e547d749445eaa0964aba76738090ec88f5e63c4585122170f98c67a7ea922dc",
+  "rule": "1 only when the entire 0.05-degree cell has no land-polygon area overlap",
+  "bbox_wgs84": [
+    106.35,
+    -6.2,
+    107.1,
+    -5.35
+  ],
+  "resolution_degrees": 0.05,
+  "water_rows_south_to_north": [
+    "000000000000000",
+    "000000000000000",
+    "000000000100000",
+    "000000001111000",
+    "011111111111100",
+    "111111111111100",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111",
+    "111111111111111"
+  ]
+}

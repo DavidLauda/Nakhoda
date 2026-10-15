@@ -12,7 +12,7 @@ def subset_pair(config:dict,output:pathlib.Path) -> tuple[pathlib.Path,pathlib.P
     end=dt.datetime.now(dt.timezone.utc).date();start=end-dt.timedelta(days=10)
     files=[]
     for label,dataset,variable in [('sst',product['sst_dataset_id'],product['sst_variable']),('chl',product['chlorophyll_dataset_id'],product['chlorophyll_variable'])]:
-        filename=f'{label}_{start}_{end}.nc';path=output/filename
+        filename=f'{label}_{config["marine_aoi_version"]}_{start}_{end}.nc';path=output/filename
         if not path.exists():
             copernicusmarine.subset(dataset_id=dataset,variables=[variable],minimum_longitude=box[0],maximum_longitude=box[2],minimum_latitude=box[1],maximum_latitude=box[3],start_datetime=str(start),end_datetime=str(end),output_filename=filename,output_directory=str(output),force_download=True)
         files.append(path)

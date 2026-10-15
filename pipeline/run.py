@@ -8,6 +8,7 @@ import pathlib
 import traceback
 import numpy as np
 from pipeline.analysis.environment import VERSION as ENV_VERSION,environmental_index,publishable_positions
+from pipeline.analysis.water_mask import load_water_mask
 from pipeline.providers import noaa,marine,sentinel
 from pipeline.publish import Publisher,stable_key
 
@@ -56,7 +57,8 @@ def run_marine(pub:Publisher|None):
     key=stable_key('Marine',CONFIG['marine_aoi_version'],dt.datetime.now(dt.timezone.utc).date(),ENV_VERSION)
     if pub and pub.table('analysis_runs',{'select':'status','run_key':f'eq.{key}'}) and pub.table('analysis_runs',{'select':'status','run_key':f'eq.{key}'})[0]['status']=='success':return {'status':'no_new_data'}
     files=marine.subset_pair(CONFIG,OUT/'marine-cache');grid=marine.read_common_grid(*files,CONFIG)
-    result=environmental_index(grid['sst_c'],grid['chl_mg_m3'],grid['latitudes'],grid['longitudes'],min_cells=CONFIG['environment']['min_valid_cells'])
+    water_mask=load_water_mask(ROOT/'config'/CONFIG['marine_water_mask'],CONFIG['search_bbox_wgs84'],grid['resolution_degrees'],grid['latitudes'],grid['longitudes'])
+    result=environmental_index(grid['sst_c'],grid['chl_mg_m3'],grid['latitudes'],grid['longitudes'],marine_mask=water_mask,min_cells=CONFIG['environment']['min_valid_cells'])
     source_ids=[f'{CONFIG["marine"]["sst_dataset_id"]}@{grid["sst_time"]}',f'{CONFIG["marine"]["chlorophyll_dataset_id"]}@{grid["chl_time"]}']
     run_id=run_record(pub,'Copernicus Marine',key,'running')
     cells=[]
@@ -64,7 +66,7 @@ def run_marine(pub:Publisher|None):
         area_id=pub.pilot_area() if pub else None;res=grid['resolution_degrees']
         for y,x in publishable_positions(result['index'],CONFIG['environment']['max_published_cells']):
             lon=float(grid['longitudes'][x]);lat=float(grid['latitudes'][y]);half=res/2
-            cell={'result_key':stable_key(source_ids,CONFIG['marine_aoi_version'],ENV_VERSION,y,x),'area_id':area_id,'geom':f'SRID=4326;POLYGON(({lon-half} {lat-half},{lon+half} {lat-half},{lon+half} {lat+half},{lon-half} {lat+half},{lon-half} {lat-half}))','lon':lon,'lat':lat,'observed_start':min(grid['sst_time'],grid['chl_time']),'observed_end':max(grid['sst_time'],grid['chl_time']),'source_asset_ids':source_ids,'sst_c':float(grid['sst_c'][y,x]),'chlorophyll_mg_m3':float(grid['chl_mg_m3'][y,x]),'front_rank':float(result['front_rank'][y,x]),'chlorophyll_component':float(result['chlorophyll_component'][y,x]),'index_score':int(result['index'][y,x]),'algorithm_version':ENV_VERSION,'resolution':f'{res} degree (~5.5 km)','quality_flags':['zoning_unverified','chlorophyll_gapfilled_l4'],'exclusion':None,'zoning_verified':False}
+            cell={'result_key':stable_key(source_ids,CONFIG['marine_aoi_version'],ENV_VERSION,y,x),'area_id':area_id,'geom':f'SRID=4326;POLYGON(({lon-half} {lat-half},{lon+half} {lat-half},{lon+half} {lat+half},{lon-half} {lat+half},{lon-half} {lat-half}))','lon':lon,'lat':lat,'observed_start':min(grid['sst_time'],grid['chl_time']),'observed_end':max(grid['sst_time'],grid['chl_time']),'source_asset_ids':source_ids,'sst_c':float(grid['sst_c'][y,x]),'chlorophyll_mg_m3':float(grid['chl_mg_m3'][y,x]),'front_rank':float(result['front_rank'][y,x]),'chlorophyll_component':float(result['chlorophyll_component'][y,x]),'index_score':int(result['index'][y,x]),'algorithm_version':ENV_VERSION,'resolution':f'{res} degree (~5.5 km)','quality_flags':['zoning_unverified','chlorophyll_gapfilled_l4','natural_earth_land_mask_v0.1'],'exclusion':None,'zoning_verified':False}
             cells.append(cell)
         if pub:
             for id_,dataset,url in [(source_ids[0],CONFIG['marine']['sst_product_id'],'https://data.marine.copernicus.eu/product/SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001/services'),(source_ids[1],CONFIG['marine']['chlorophyll_product_id'],'https://data.marine.copernicus.eu/product/OCEANCOLOUR_GLO_BGC_L4_NRT_009_102/services')]:pub.upsert('source_assets',{'source_name':'Copernicus Marine','product_id':dataset,'asset_id':id_,'source_url':url,'observed_start':min(grid['sst_time'],grid['chl_time']),'observed_end':max(grid['sst_time'],grid['chl_time']),'native_resolution':'0.05 degree SST / 4 km CHL','quality_flags':[]},'source_name,product_id,asset_id')
