@@ -1,55 +1,30 @@
-# Nakhoda pilot
+# Nakhoda
 
-Nakhoda is one responsive Bahasa Indonesia Next.js PWA for a fisherman and an assigned reviewer. Supabase Auth, PostGIS and private Storage hold the shared data; a scheduled Python job discovers and processes satellite products; a reviewed outbox sends through the Gmail API. The application uses genuine provider data only after the pipeline publishes it. An empty state is intentional when accounts or observations are missing.
+Nakhoda is a Bahasa Indonesia hackathon PWA for a coastal pilot around Jakarta Bay and Kepulauan Seribu. It has two independent quick-entry flows:
 
-This repository began empty on 14 October 2026. No Supabase project, GitHub remote, CDSE/Copernicus Marine account, Gmail OAuth client, sender, recipient, map style or deployment was supplied. The code is a **partial MVP until these are configured and the live acceptance checks pass**. No credentials belong in Git.
+- **Nelayan:** a real map, optional on-device GPS position, and dated sea-condition points from SST and chlorophyll data. The relative environmental index is experimental and does **not** prove fish abundance, safe passage, or permission to fish.
+- **Pemerintah:** an ecosystem dashboard summarizing published satellite and ocean data, source health, gaps, and evidence-based next steps. Heat-stress context and optical changes require field verification before any restoration claim.
 
-With no account configuration, run `npm run dev` and open `/source-probe` to inspect the real, locally processed NOAA record. It is labelled separately from the authenticated live observation map and cannot substitute for a published Supabase observation. See [demo sequence](docs/DEMO.md) and [completion report](docs/COMPLETION.md).
+Email delivery, field reports, trip tracking, case review, and administration remain in the code as legacy pilot features, but they are not in the primary navigation or demo flow. The current priority is the fisher map and ecosystem dashboard.
 
 ## Local start
 
-1. Install Node.js 22+, Python 3.12+, and npm. Run `npm ci` and `python -m pip install -r pipeline/requirements.txt`.
-2. Create a Supabase project on a plan for which your team is eligible. Enable the PostGIS extension and apply `supabase/migrations/202610140001_initial.sql` in the SQL editor or through the Supabase CLI. The migration creates private `report-media` and `analysis-artifacts` buckets.
-3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. The latter is server-only. Set `APP_BASE_URL` to the actual local/hosted URL. Do not put any secret in a `NEXT_PUBLIC_` variable.
-4. Run `npm run dev` and open `http://localhost:3000`. For hackathon quick login, enable **Anonymous Sign-Ins** in Supabase Authentication → Sign In / Providers and set both `NEXT_PUBLIC_QUICK_LOGIN_ENABLED=true` and `QUICK_LOGIN_FULL_ACCESS=true`. **Masuk Cepat** gives each visitor a session without email and access to the real fisherman, reviewer, and admin workflows. This is intentionally full access to the pilot app while the server flag is on, including case edits, recipient configuration, and role assignment; use it only for the controlled hackathon judging window, then turn both flags off. A quick-login session cannot be recovered after signing out or clearing browser data. Email registration remains available when quick login is off and requires working confirmation email delivery.
-5. Configure a licensed `NEXT_PUBLIC_MAP_STYLE_URL` if a geographic basemap is desired. Without it, the data list remains usable and the map explains the missing style. Keep any public map key restricted to your deployed app origin and follow attribution/usage terms.
+1. Install Node.js 22+ and run `npm ci`. For the satellite pipeline, also install Python 3.12+ and `python -m pip install -r pipeline/requirements.txt`.
+2. Create a Supabase project, enable PostGIS, and apply `supabase/migrations/202610140001_initial.sql`.
+3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. The service-role key must remain server-side. Set `APP_BASE_URL` to the deployment URL.
+4. For hackathon quick entry, enable Supabase **Anonymous Sign-Ins** and set `NEXT_PUBLIC_QUICK_LOGIN_ENABLED=true` and `QUICK_LOGIN_FULL_ACCESS=true`. Run `npm run dev`, open `http://localhost:3000`, and choose **Masuk sebagai Nelayan** or **Masuk sebagai Pemerintah**. Each button creates an anonymous session with its own portal role. Sign out to switch portals. The government quick-entry role can read pilot source details, so use these flags only for a controlled judging environment.
+5. The map uses OpenStreetMap standard raster tiles by default with attribution. `NEXT_PUBLIC_MAP_STYLE_URL` can override the basemap with a licensed MapLibre style. Follow the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/) if using the default; tiles require an internet connection and are not bulk-cached by the PWA.
 
-## Manual setup checklist
+## Data and limits
 
-| Input to supply | Where | Why |
-|---|---|---|
-| Supabase project URL, public anon key, service-role key | `.env.local`; Actions secrets for URL and service key | Auth, database, private media and published observations |
-| Anonymous Sign-Ins enabled and both quick-login flags set to `true` | Supabase Auth and app environment | One-click full app access for judging; disable after the event |
-| GitHub repository and Actions enabled, actual minutes/spending controls | GitHub | Daily 03:17 UTC run and manual dispatch; no paid upgrade authorized |
-| CDSE OAuth client ID/secret | Actions secrets `CDSE_CLIENT_ID`, `CDSE_CLIENT_SECRET` | Catalog and cropped Sentinel-2 Process requests |
-| Copernicus Marine account username/password | Actions secrets `COPERNICUSMARINE_SERVICE_USERNAME`, `COPERNICUSMARINE_SERVICE_PASSWORD` | Bounded SST/chlorophyll subsets |
-| Dedicated Gmail address, Google OAuth client ID/secret/refresh token with only `gmail.send` scope | Server env, never browser | Reviewed real outbound messages |
-| Team-controlled test inbox address | `EMAIL_TEST_ALLOWLIST` and admin recipient directory | `EMAIL_MODE=test` blocks all other recipients; empty list blocks all sending |
-| HTTPS Next.js host/provider subdomain and production env vars | Host | Installable PWA and authenticated API |
-| Licensed map style URL | Public env | MapLibre basemap |
-| Pilot AOI visual confirmation, habitat footprint/license, legal zoning | `pipeline/config/pilot.json` and vetted GIS import | Current squares are search areas, **not verified coral or legal fishing zones** |
-| Institutional contacts and communication intent | Admin directory, only if/when live referral is intended | No institution should receive a test email |
+The Python pipeline supports NOAA Coral Reef Watch, Copernicus Marine SST/chlorophyll, and CDSE Sentinel-2. A scheduled or manual GitHub Actions run records source checks and, when configured with Supabase credentials, publishes qualifying results. `pipeline/config/pilot.json` defines the current study envelope. Run sources independently with `python -m pipeline.run --source noaa|marine|sentinel`; inspect Actions logs, `discovery-metadata`, acquisition dates, source IDs, quality flags, and `analysis_runs` before presenting a result.
 
-## Pipeline
+**Conservation zones are not yet imported as verified polygons.** The app therefore does not mark any point “legal to fish” or “safe to fish.” The fisher flow links to the official [KKP SIDAKO conservation map](https://sidako.kkp.go.id/sidako/map) for manual checking. The KKP has also published [Decision 28/2026 for the South Kepulauan Seribu conservation area](https://jdih.kkp.go.id/Homedev/DetailPeraturan/7029); its operative zone geometry and activity rules still need authoritative GIS validation before they can drive in-app avoidance. This is the principal remaining gap for the requested fishing guidance.
 
-`python -m pipeline.run --source noaa` runs the public NOAA adapter locally. `--source marine`, `--source sentinel`, or `--source all` run the other sources independently. Source-specific run/quality states are written to `analysis_runs` when Supabase is configured. `pipeline/out/` holds short-lived local diagnostic metadata and is ignored by Git. Raw provider files are cached locally only during a run and never sent to the PWA. The workflow `.github/workflows/pipeline.yml` schedules daily discovery at 03:17 UTC (10:17 WIB), permits `workflow_dispatch`, limits concurrency to one and the job to 90 minutes. Its metadata artifact expires after three days.
+The environmental index ranks conditions within available cells and is not a catch forecast. Optical differences are not a diagnosis of coral damage. There are no dedicated live mangrove-damage, shoreline-abrasion, or marine-waste measurements in this pilot. The government dashboard names those gaps and proposes data collection rather than inventing metrics. GPS is requested only when the fisher presses **Tampilkan lokasi saya** and stays in the browser; it is cleared when tracking stops or the page unmounts. GPS requires HTTPS or localhost and is not a navigation instrument.
 
-The pipeline checks source IDs and result keys before expensive optical processing. Results are keyed by source IDs, AOI version and algorithm version. Assets upload before a manifest is published; a failed source does not erase last good records. Repeating an identical pair returns `no_new_data`. NOAA downloads are capped; CDSE requests are limited to two ~1–2 km study squares and at most 500×500 output pixels. Copernicus Marine requests cover only the pilot envelope and ten days. See [source selection](docs/SOURCES.md) and [algorithms](docs/ALGORITHMS.md).
+## Checks and documentation
 
-If a source fails, inspect its `analysis_runs.error_code` and the GitHub run, correct credentials/configuration or wait for provider recovery, then dispatch the same source again. Verify its source asset IDs, dates, manifest and latest usable result before the demo. A provider check with no new scene is not proof that optical analysis ran; demonstrate a genuine documented pair separately.
+Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm test`. Pipeline tests are `python -m pytest -q pipeline/tests` when Python dependencies are available. See [demo flow](docs/DEMO.md), [algorithm contract](docs/ALGORITHMS.md), [source notes](docs/SOURCES.md), and [dated progress](docs/progress/2026-10-15-fisher-government-flows.md).
 
-## Gmail controlled test
-
-Create a Google Cloud OAuth client for the dedicated team Gmail account, enable Gmail API, grant `https://www.googleapis.com/auth/gmail.send`, and obtain a refresh token under the team's control. Put the credentials only in server environment variables. Set `EMAIL_SENDER`, leave `EMAIL_MODE=test`, and place only the team's inbox in `EMAIL_TEST_ALLOWLIST`. Add that same address as a test recipient in `/admin`.
-
-For a real test, submit a report, use an assigned reviewer to move the new case to `ready_for_referral` with a reason, choose the test recipient, inspect the full preview and exact addresses, and click **Kirim laporan yang ditinjau**. The outbox records `provider_accepted` and Gmail's message ID only after API success. Verify inbox receipt separately. An `unknown` send state requires checking the sender's Sent folder before any manual retry. A revoked/expired OAuth grant requires reconnection; testing-mode refresh tokens may be short-lived. Switching to `EMAIL_MODE=live` also requires an administrator-verified official recipient and a deliberate reviewed send; it is not needed for the hackathon test.
-
-## Demo and checks
-
-Run `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, and `python -m pytest -q pipeline/tests`. For the full demo, use two fisherman accounts and one assigned reviewer: record an active foreground trip, opt in/out of approximate sharing, submit an offline draft with photo and linked field stance, reconnect/sync, review the case, preview the team-only email, send once, and verify actual receipt. Show the GitHub run and observation dates; do not imply an old image is fresh. Test install/open on an Android device and hosted HTTPS integration separately. See [verification status](docs/COMPLETION.md).
-
-## Privacy and limits
-
-All API requests verify Supabase access tokens. Privileged routes additionally check role and pilot-area membership. RLS permits only owners to read precise trips/points and reports; other participants receive only server-rounded presence, expiring at read time after three minutes. Private photos and analysis imagery use brief authorized signed URLs. The browser stores per-account drafts and pending trip points in IndexedDB. Review and email require an online session. No browser background GPS promise is made. Precise trip deletion/retention automation and production abuse controls still need a deployment decision and further work.
-
-The environmental number is an unvalidated relative index, not a catch probability. Optical differences cannot diagnose coral damage. No legal fishing-zone coverage is verified; all environmental cells remain exploration only. No purchase, paid worker, LLM, custom domain or native app is required.
+Keep service-role, provider, and Gmail credentials out of chat, screenshots, client-side variables, and Git. Gmail configuration is optional for the current demo.

@@ -1,17 +1,22 @@
-# Honest pilot demo sequence
+# Nakhoda hackathon demo — 15 October 2026
 
-For juror self-service, enable Supabase **Anonymous Sign-Ins** and set both `NEXT_PUBLIC_QUICK_LOGIN_ENABLED=true` and `QUICK_LOGIN_FULL_ACCESS=true` in the deployed app. The login screen leads with **Masuk Cepat**. This creates a separate session for each browser without email and grants full access to the real fisherman, reviewer, and admin workflows while the server flag is on. Team email login remains available under **Masuk dengan akun tim**. Quick-login sessions cannot be recovered after sign-out or browser-data removal. This access includes writes to the pilot database and potentially external email if Gmail is configured, so enable it only for the controlled judging window and turn both flags off afterward. [Supabase guidance](https://supabase.com/docs/guides/auth/auth-anonymous)
+## Nelayan
 
-The `/source-probe` page remains a separate, locally processed NOAA record and cannot stand in for published Supabase observations. The Marine and Sentinel pilot runs have published data; show their actual dates, quality flags and limitations instead of presenting them as verified coral damage or current fishing guidance.
+1. On the entry screen, choose **Masuk sebagai Nelayan**. No email or password is needed when quick login is enabled.
+2. Open the map and press **Tampilkan lokasi saya**. Permit browser GPS. The blue dot and accuracy label show the device's current position; **Hentikan GPS** removes it. Do this on HTTPS or localhost.
+3. Select a sea-condition point. Explain its date, SST, chlorophyll, relative environmental index, quality flags, and the visible unverified zoning status. If no recent cells exist, show the empty state; do not claim a fishing recommendation.
+4. Open the linked official KKP conservation map to check restrictions manually. Explain that Nakhoda cannot yet certify an in-app legal fishing zone because verified zone polygons have not been imported. Check weather and vessel safety separately.
 
-After completing the README setup checklist, verify the following on a hosted HTTPS build using two separate quick-login browser sessions; each session can open the fisherman, reviewer, and admin workflows:
+## Pemerintah
 
-1. Manually dispatch the Actions workflow for NOAA and inspect the run, database `analysis_runs`, source assets, observation dates and quality flags. Run CDSE and Marine separately, recording any valid pair or explicit unavailable reason. A no-new-data check is not an optical demonstration.
-2. Use Masuk Cepat in browser A. Open a genuine published observation and read the source time and limitations. Start a foreground trip; show current position/accuracy. Enable approximate sharing separately.
-3. Use Masuk Cepat in browser B on another device. Verify a rounded marker and active-participant count, with no access to A's precise trip points. Disable A's sharing and verify the marker disappears; repeat after three-minute expiry.
-4. Create a report with actual location, observation time and photo, linked to a genuine indication. Disconnect before final submission, reload, and show the local/pending label. Reconnect/reopen and use **Sinkronkan sekarang**. Verify exactly one server report, private photo and preserved observation time.
-5. Open Dasbor peninjau in the same quick-login session. Open the case and photo, examine satellite source IDs, field stance and distance/time mismatch. Update status with a reason and inspect the audit event and reporter-visible follow-up.
-6. Use the team-controlled recipient directory and `EMAIL_MODE=test`. Preview the exact **From**, **To**, subject and full body. Send once through Gmail API. Record the outbox provider message ID, then check the team's inbox separately for receipt. Never send to an institution merely for this demonstration.
-7. On Android, install the HTTPS PWA, open it from its icon, then test cached shell and an offline draft. State that browser tracking can pause when hidden or locked.
+1. Sign out and choose **Masuk sebagai Pemerintah**. This opens the ecosystem dashboard directly, with no email or password.
+2. Review the counts of published heat-context observations, optical changes, fresh sea-condition cells, and source checks. Open an observation to inspect its provider, acquisition time, algorithm, quality flags, and limitations.
+3. Walk through the **Langkah berikutnya** cards: validate official zoning, examine heat context, investigate optical changes, and collect missing mangrove, abrasion, and waste measurements. These are proposed verification actions, not claims that damage has been proven.
+4. Open **Kesehatan data** and compare source-check times with usable observation times. In GitHub Actions, show the separate Marine/Sentinel runs and `discovery-metadata` artifact to verify actual source IDs and errors.
 
-If a source, account, or connection is unavailable, show the exact missing-data state and mark the corresponding acceptance test incomplete. Historical dates must remain historical. Environmental ranking is an unvalidated relative index; optical difference is not a coral-damage diagnosis.
+## Acceptance boundaries
+
+- Quick entry must be enabled in both Supabase and the app environment. The two portal buttons create distinct anonymous roles. The government role has broad pilot access while `QUICK_LOGIN_FULL_ACCESS=true`; disable that flag after the controlled demo.
+- Map tiles need network access. GPS is optional and browser-only. Neither is proof of marine safety.
+- No verified conservation polygons, catch validation, or direct mangrove/abrasion/waste datasets are present yet. Do not label an area as approved for fishing or a habitat as damaged on these data alone.
+- Email, field reports, and case review are outside the primary judging path.

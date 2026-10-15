@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 export type Role = 'fisherman' | 'reviewer' | 'admin';
-export type Identity = { id: string; role: Role; displayName: string; isAnonymous: boolean };
+export type Identity = { id: string; role: Role; displayName: string; isAnonymous: boolean; portal: 'fisherman' | 'government' };
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public retryable = false) { super(message); }
@@ -28,7 +28,8 @@ export async function identity(request: NextRequest): Promise<Identity> {
   const { data, error: profileError } = await serviceDb().from('profiles').select('role,display_name').eq('id', auth.user.id).single();
   if (profileError || !data) throw new ApiError(403, 'missing_profile', 'Profil akun belum tersedia.');
   const quickLogin = auth.user.is_anonymous === true && process.env.QUICK_LOGIN_FULL_ACCESS === 'true';
-  return { id: auth.user.id, role: quickLogin ? 'admin' : data.role as Role, displayName: quickLogin ? 'Akses Cepat' : data.display_name, isAnonymous: auth.user.is_anonymous === true };
+  const portal = quickLogin && auth.user.user_metadata?.portal === 'government' ? 'government' : data.role === 'fisherman' ? 'fisherman' : 'government';
+  return { id: auth.user.id, role: quickLogin ? (portal === 'government' ? 'reviewer' : 'fisherman') : data.role as Role, displayName: quickLogin ? (portal === 'government' ? 'Akses Pemerintah' : 'Akses Nelayan') : data.display_name, isAnonymous: auth.user.is_anonymous === true, portal };
 }
 
 export async function reviewer(user: Identity, areaId: string) {

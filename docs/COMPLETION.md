@@ -1,5 +1,7 @@
 # Requirement-by-requirement status — 14 October 2026
 
+> Historical status for the original report/case/email concept. The hackathon product direction changed on 15 October 2026. See [current two-flow progress](progress/2026-10-15-fisher-government-flows.md) and [current demo](DEMO.md). Statements below describe the old checkpoint and should not be read as current acceptance status.
+
 **Implemented** means source exists; **verified** means the indicated check actually ran; **blocked** means a confirmed acceptance test cannot run without team setup; **incomplete** means code or verification remains. None of these labels implies the full MVP has passed acceptance. This repository started with no project accounts, credentials or GitHub remote.
 
 | PRD requirement | Status and evidence | Next action / limitation |

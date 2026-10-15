@@ -94,7 +94,7 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
   }
   if(path[0]==='presence') {
     if(method==='GET') {
-      if(user.role!=='fisherman' && !user.isAnonymous) return json({items:[],expiresAfterSeconds:180,reviewerNote:'Peninjau melihat kepadatan agregat per sel, bukan penanda nelayan perorangan.'});
+      if(user.role!=='fisherman') return json({items:[],expiresAfterSeconds:180,reviewerNote:'Peninjau melihat kepadatan agregat per sel, bukan penanda nelayan perorangan.'});
       const b=bbox(request.nextUrl.searchParams.get('bbox'));
       const cutoff=new Date(Date.now()-180000).toISOString();
       const q=await db.from('shared_presence').select('user_id,pseudonym,approximate_lon,approximate_lat,heartbeat_at').eq('sharing_enabled',true).gte('heartbeat_at',cutoff).limit(200);
