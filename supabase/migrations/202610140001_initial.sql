@@ -141,7 +141,7 @@ create function public.cell_presence_counts(p_viewer uuid)
 returns table(cell_id uuid, participant_count bigint) language sql stable security definer set search_path=public as $$
   select c.id, count(p.user_id) from public.environment_cells c
   left join public.shared_presence p on p.sharing_enabled and p.heartbeat_at > now()-interval '3 minutes'
-    and p.user_id<>p_viewer and ST_Contains(c.geom,p.approximate_geom)
+    and p.user_id<>p_viewer and extensions.ST_Contains(c.geom,p.approximate_geom)
   group by c.id
 $$;
 revoke all on function public.cell_presence_counts(uuid) from public, anon, authenticated;
