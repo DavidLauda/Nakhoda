@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 export type Role = 'fisherman' | 'reviewer' | 'admin';
-export type Identity = { id: string; role: Role; displayName: string };
+export type Identity = { id: string; role: Role; displayName: string; isAnonymous: boolean };
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public retryable = false) { super(message); }
@@ -27,7 +27,7 @@ export async function identity(request: NextRequest): Promise<Identity> {
   if (error || !auth.user) throw new ApiError(401, 'invalid_session', 'Sesi tidak valid. Masuk kembali.');
   const { data, error: profileError } = await serviceDb().from('profiles').select('role,display_name').eq('id', auth.user.id).single();
   if (profileError || !data) throw new ApiError(403, 'missing_profile', 'Profil akun belum tersedia.');
-  return { id: auth.user.id, role: data.role as Role, displayName: data.display_name };
+  return { id: auth.user.id, role: data.role as Role, displayName: data.display_name, isAnonymous: auth.user.is_anonymous === true };
 }
 
 export async function reviewer(user: Identity, areaId: string) {

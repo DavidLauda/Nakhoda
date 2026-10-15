@@ -1,6 +1,8 @@
 # Honest pilot demo sequence
 
-Until accounts exist, start `npm run dev` and show `/source-probe`: genuine 12 October 2026 NOAA fields, native grid cell, exact asset IDs and SHA-256s. Point out the banner saying this is locally processed and **not** in the authenticated live map. Show `/api/health` and the setup state. Do not imply the current prototype has sent email or processed a Sentinel scene.
+For juror self-service, enable Supabase **Anonymous Sign-Ins** and set `NEXT_PUBLIC_DEMO_GUEST_ENABLED=true` in the deployed app. The login screen then leads with **Masuk sebagai tamu demo**. This creates a separate fisherman account for each browser without sending email; the team-only email login remains under **Masuk akun tim** for reviewers and admins. Guest accounts cannot be recovered after sign-out or browser-data removal, and they cannot access reviewer/admin routes. Anonymous sign-ins use the `authenticated` database role, so review RLS and rate limits before enabling them. [Supabase guidance](https://supabase.com/docs/guides/auth/auth-anonymous)
+
+The `/source-probe` page remains a separate, locally processed NOAA record and cannot stand in for published Supabase observations. The Marine and Sentinel pilot runs have published data; show their actual dates, quality flags and limitations instead of presenting them as verified coral damage or current fishing guidance.
 
 After completing the README setup checklist, verify the following on a hosted HTTPS build using two fishermen and one assigned reviewer:
 
