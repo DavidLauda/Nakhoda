@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import numpy as np
 
-VERSION = 'environment-index-v0.2'
+VERSION = 'environment-index-v0.3'
 
 def percentile_ranks(values: np.ndarray) -> np.ndarray:
     """Ranks finite values in [0,1], averaging ties; NaN stays NaN."""

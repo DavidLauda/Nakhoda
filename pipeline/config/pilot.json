@@ -1,6 +1,6 @@
 {
-  "aoi_version": "pilot-aoi-v0.1",
-  "search_bbox_wgs84": [106.35, -6.20, 107.10, -5.35],
+  "aoi_version": "pilot-aoi-v0.2",
+  "search_bbox_wgs84": [106.40, -5.95, 106.90, -5.35],
   "reef_study_areas": [
     {"code":"pari","name":"Pulau Pari vicinity — candidate study square; habitat unverified","bbox_wgs84":[106.602,-5.870,106.615,-5.857],"habitat_mask":null,"zoning_verified":false},
     {"code":"pramuka","name":"Pulau Pramuka vicinity — candidate study square; habitat unverified","bbox_wgs84":[106.607,-5.753,106.620,-5.740],"habitat_mask":null,"zoning_verified":false}
@@ -8,5 +8,5 @@
   "noaa": {"product_id":"CRW_5km_v3.1_daily","base_url":"https://www.star.nesdis.noaa.gov/pub/socd/mecb/crw/data/5km/v3.1_op/nc/v1.0/daily","fields":{"sst":"sst","hotspot":"hs","dhw":"dhw","alert_7day":"baa5-max-7d"}},
   "marine": {"sst_product_id":"SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001","sst_dataset_id":"METOFFICE-GLO-SST-L4-NRT-OBS-SST-V2","sst_variable":"analysed_sst","chlorophyll_product_id":"OCEANCOLOUR_GLO_BGC_L4_NRT_009_102","chlorophyll_dataset_id":"cmems_obs-oc_glo_bgc-plankton_nrt_l4-gapfree-multi-4km_P1D","chlorophyll_variable":"CHL","max_interval_hours":72,"common_grid_degrees":0.05},
   "sentinel": {"product_id":"sentinel-2-l2a","catalog_url":"https://sh.dataspace.copernicus.eu/catalog/v1/search","process_url":"https://sh.dataspace.copernicus.eu/process/v1","token_url":"https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token","current_window_days":30,"baseline_min_days":30,"baseline_max_days":120,"max_scene_cloud_percent":40,"output_pixel_m":10,"max_output_pixels":500,"min_valid_overlap":0.70,"max_median_brightness_shift":0.08,"candidate_z":3.0,"min_component_pixels":9},
-  "environment": {"algorithm_version":"environment-index-v0.2","max_age_days":7,"min_valid_cells":20,"front_weight":0.60,"chlorophyll_weight":0.40,"chlorophyll_rank_peak":0.60,"chlorophyll_rank_width":0.40,"max_published_cells":300}
+  "environment": {"algorithm_version":"environment-index-v0.3","max_age_days":7,"min_valid_cells":20,"front_weight":0.60,"chlorophyll_weight":0.40,"chlorophyll_rank_peak":0.60,"chlorophyll_rank_width":0.40,"max_published_cells":300}
 }

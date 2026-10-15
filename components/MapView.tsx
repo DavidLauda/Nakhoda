@@ -13,7 +13,7 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
   const element=useRef<HTMLDivElement>(null), map=useRef<MlMap|null>(null), markers=useRef<Marker[]>([]),locationMarker=useRef<Marker|null>(null),[mapReady,setMapReady]=useState(false);
   const style=process.env.NEXT_PUBLIC_MAP_STYLE_URL || defaultStyle;
   useEffect(()=>{if(!element.current)return;let disposed=false;
-    import('maplibre-gl').then(({default:maplibre})=>{if(disposed||!element.current)return;const m=new maplibre.Map({container:element.current,style,center:[106.79,-5.85],zoom:9});m.addControl(new maplibre.NavigationControl(),'top-right');m.on('click',e=>onPick?.(e.lngLat.lng,e.lngLat.lat));map.current=m;setMapReady(true);});
+    import('maplibre-gl').then(({default:maplibre})=>{if(disposed||!element.current)return;const m=new maplibre.Map({container:element.current,style,center:[106.65,-5.65],zoom:9.5});m.addControl(new maplibre.NavigationControl(),'top-right');m.on('click',e=>onPick?.(e.lngLat.lng,e.lngLat.lat));map.current=m;setMapReady(true);});
     return()=>{disposed=true;locationMarker.current?.remove();locationMarker.current=null;map.current?.remove();map.current=null;};
   // Callbacks change without rebuilding map.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36,5 +36,5 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
     return()=>{m.off('load',install);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);};
   },[areas,onAreaSelect,mapReady]);
   useEffect(()=>{if(!map.current)return;if(!userLocation){locationMarker.current?.remove();locationMarker.current=null;return;}let disposed=false;import('maplibre-gl').then(({default:maplibre})=>{if(disposed||!map.current)return;if(!locationMarker.current){const el=document.createElement('div');el.className='my-location-pin';el.setAttribute('aria-label','Lokasi GPS saya');locationMarker.current=new maplibre.Marker({element:el}).setLngLat([userLocation.lon,userLocation.lat]).addTo(map.current);}else locationMarker.current.setLngLat([userLocation.lon,userLocation.lat]);map.current.easeTo({center:[userLocation.lon,userLocation.lat],zoom:Math.max(map.current.getZoom(),12)});});return()=>{disposed=true;};},[userLocation,mapReady]);
-  return <div ref={element} className="map-canvas" aria-label="Peta pilot Teluk Jakarta dan Kepulauan Seribu"/>;
+  return <div ref={element} className="map-canvas" aria-label="Peta pilot Kepulauan Seribu"/>;
 }

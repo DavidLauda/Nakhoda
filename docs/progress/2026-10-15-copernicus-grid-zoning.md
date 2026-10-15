@@ -8,7 +8,8 @@ Keep the pilot in Kepulauan Seribu and show a continuous, data-based division of
 
 ## Changes
 
-- Publish every finite 0.05° Marine index cell in the bounded pilot grid, with a 300-cell safety limit, instead of selecting only five separated cells. The index formula is unchanged; its version is `environment-index-v0.2` so the existing daily run can publish the expanded grid once.
+- Publish every finite 0.05° Marine index cell in the bounded pilot grid, with a 300-cell safety limit, instead of selecting only five separated cells. The index formula is unchanged.
+- The first full-grid run (`environment-index-v0.2`) published 164 cells, but visual review showed that the broad original pilot envelope colored some coastal mainland. The corrected envelope is `[106.40, -5.95, 106.90, -5.35]`, centered on the Kepulauan Seribu pilot; its AOI and publication versions are `pilot-aoi-v0.2` and `environment-index-v0.3`. This envelope is an operational study boundary, not an official administrative or legal boundary.
 - Serve only the newest acquisition pair and algorithm version to the app. Older cells remain in the database for provenance but cannot mix visually with the current grid. Scores older than seven days are hidden.
 - Show the grid as clickable map polygons. Dark green identifies the highest 40% of measured cells by relative SST/chlorophyll index; pale green identifies other measured cells. The six BIG conservation polygons remain above the grid, with their source zone types shown separately.
 - Keep the government dashboard's measured-cell count in sync with the same current grid.
@@ -18,13 +19,14 @@ Keep the pilot in Kepulauan Seribu and show a continuous, data-based division of
 - Green is a relative **sea-condition indicator**, not validated fishing suitability, a catch forecast, a safe-navigation route, or permission to fish. The highest 40% threshold is a display convention within the current pilot grid.
 - The BIG polygons are a northern national-park zoning reference. The South Kepulauan Seribu area designated by KKP Decision 28/2026 is not covered by those six polygons. Blank water is unclassified in this app; the official KKP map and current activity rules must be checked independently.
 - CDSE Sentinel-2 currently covers only the Pari and Pramuka candidate study squares. Its optical-change output has cloud and quality screening but no validated habitat or fishing-suitability model. It cannot responsibly create conservation boundaries or determine the green fishing layer from those two squares.
-- The Marine grid covers the configured pilot envelope and nearby water. A 0.05° cell can overlap land or a smaller legal zone; map colors do not resolve sub-cell boundaries.
+- The Marine grid covers the configured pilot envelope and nearby water. The narrowed envelope excludes the mainland cells seen in the first run, but it is not a coastline mask. A 0.05° cell can overlap an island or a smaller legal zone; map colors do not resolve sub-cell boundaries.
 
 ## Verification
 
 - TypeScript typecheck and both Node tests passed; ESLint passed with four pre-existing warnings.
 - The three focused Python environment-index tests passed. Production Next.js build passed with the same four warnings.
-- GitHub Marine run and live map check: pending at the time of this entry; update with actual results after completion.
+- [GitHub Marine run #3](https://github.com/DavidLauda/Nakhoda/actions/runs/38745940366) succeeded with 164 published cells in version 0.2. The `discovery-metadata` artifact contains 164 unique result keys, SST acquisition `2026-10-14T00:00:00Z`, chlorophyll acquisition `2026-10-13T00:00:00Z`, score range 1–85, and `zoning_unverified` plus `chlorophyll_gapfilled_l4` on every cell. The government dashboard reported 164 current cells after its local preview was restarted.
+- Corrected-envelope Marine run and live map check: pending at the time of this entry; update with actual results after completion.
 
 ## Sources
 
