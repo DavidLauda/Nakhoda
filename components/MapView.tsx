@@ -9,7 +9,7 @@ export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
 const emptyAreas:MapAreas={type:'FeatureCollection',features:[]};
 
-export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,userLocation}:{pins:MapPin[];areas?:MapAreas;onPick?:(lon:number,lat:number)=>void;onSelect?:(pin:MapPin)=>void;onAreaSelect?:(area:MapAreaProperties)=>void;userLocation?:{lon:number;lat:number;accuracy:number}|null}) {
+export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,userLocation,selectedId,focus}:{pins:MapPin[];areas?:MapAreas;onPick?:(lon:number,lat:number)=>void;onSelect?:(pin:MapPin)=>void;onAreaSelect?:(area:MapAreaProperties)=>void;userLocation?:{lon:number;lat:number;accuracy:number}|null;selectedId?:string;focus?:{lon:number;lat:number}|null}) {
   const element=useRef<HTMLDivElement>(null), map=useRef<MlMap|null>(null), markers=useRef<Marker[]>([]),locationMarker=useRef<Marker|null>(null),[mapReady,setMapReady]=useState(false);
   const style=process.env.NEXT_PUBLIC_MAP_STYLE_URL || defaultStyle;
   useEffect(()=>{if(!element.current)return;let disposed=false;
@@ -26,6 +26,7 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
       if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','priority'],true],'#14876b','#8fd0b4'],'fill-opacity':0.6}});
       if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':'#0e5c3b','line-width':1.5,'line-opacity':0.8}});
       if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#c8553d','Perlindungan Bahari','#8a5a9e','Pemanfaatan','#f0c24b','#c8553d'],'fill-opacity':0.65}});
+      if(!m.getLayer('environment-selected'))m.addLayer({id:'environment-selected',type:'line',source:'area-overlays',filter:['==',['get','id'],selectedRef.current??''],paint:{'line-color':'#0b2a3c','line-width':3.5}});
       if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':'#0b2a3c','line-width':2,'line-opacity':0.9}});
     };
     if(m.isStyleLoaded())install();else m.once('load',install);
@@ -35,6 +36,9 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
     m.on('click','environment-fill',selectEnvironment);
     return()=>{m.off('load',install);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);};
   },[areas,onAreaSelect,mapReady]);
+  const selectedRef=useRef(selectedId);
+  useEffect(()=>{selectedRef.current=selectedId;const m=map.current;if(m?.getLayer('environment-selected'))m.setFilter('environment-selected',['==',['get','id'],selectedId??'']);},[selectedId,mapReady]);
+  useEffect(()=>{if(focus&&map.current)map.current.easeTo({center:[focus.lon,focus.lat],zoom:Math.max(map.current.getZoom(),10)});},[focus,mapReady]);
   useEffect(()=>{if(!map.current)return;if(!userLocation){locationMarker.current?.remove();locationMarker.current=null;return;}let disposed=false;import('maplibre-gl').then(({default:maplibre})=>{if(disposed||!map.current)return;if(!locationMarker.current){const el=document.createElement('div');el.className='my-location-pin';el.setAttribute('aria-label','Lokasi GPS saya');locationMarker.current=new maplibre.Marker({element:el}).setLngLat([userLocation.lon,userLocation.lat]).addTo(map.current);}else locationMarker.current.setLngLat([userLocation.lon,userLocation.lat]);map.current.easeTo({center:[userLocation.lon,userLocation.lat],zoom:Math.max(map.current.getZoom(),12)});});return()=>{disposed=true;};},[userLocation,mapReady]);
   return <div ref={element} className="map-canvas" aria-label="Peta pilot Teluk Jakarta dan Kepulauan Seribu"/>;
 }
