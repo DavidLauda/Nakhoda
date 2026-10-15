@@ -1,5 +1,7 @@
 node_modules/
 .next/
+.venv/
+.tmp/
 .env
 .env.local
 .env.*.local

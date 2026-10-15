@@ -1,5 +1,6 @@
 import numpy as np
-from pipeline.analysis.environment import environmental_index, select_markers
+import pytest
+from pipeline.analysis.environment import environmental_index, publishable_positions
 
 def fields():
     y,x=np.mgrid[:9,:9]
@@ -17,8 +18,8 @@ def test_real_input_changes_reproducible_index_and_excludes_restricted_cell():
     restriction=np.zeros_like(sst,dtype=bool);restriction[4,4]=True
     excluded=environmental_index(sst,chl,lats,lons,restricted_mask=restriction)
     assert np.isnan(excluded['index'][4,4])
-    assert (4,4) not in select_markers(excluded['index'])
-    for y,x in select_markers(original['index']):
+    assert (4,4) not in publishable_positions(excluded['index'],300)
+    for y,x in publishable_positions(original['index'],300):
         assert np.isfinite(original['index'][y,x])
 
 def test_missing_input_and_constant_grid_do_not_create_score():
@@ -29,8 +30,10 @@ def test_missing_input_and_constant_grid_do_not_create_score():
     constant=environmental_index(np.full_like(sst,28),chl,lats,lons)
     assert constant['state']=='insufficient_spatial_variation'
 
-def test_markers_keep_one_cell_spacing():
+def test_every_measured_cell_is_published_with_a_bounded_limit():
     sst,chl,lats,lons=fields();result=environmental_index(sst,chl,lats,lons)
-    markers=select_markers(result['index'])
-    assert len(markers)<=5
-    assert all(max(abs(a[0]-b[0]),abs(a[1]-b[1]))>1 for i,a in enumerate(markers) for b in markers[i+1:])
+    positions=publishable_positions(result['index'],300)
+    assert len(positions)==np.isfinite(result['index']).sum()
+    assert (4,4) in positions
+    with pytest.raises(RuntimeError,match='bounded publication limit'):
+        publishable_positions(result['index'],len(positions)-1)

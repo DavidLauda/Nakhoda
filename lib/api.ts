@@ -49,10 +49,10 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
   }
   if(path[0]==='environment-cells' && method==='GET') {
     const b=bbox(request.nextUrl.searchParams.get('bbox'));
-    const q=await db.from('environment_cells').select('id,lon,lat,observed_start,observed_end,source_asset_ids,sst_c,chlorophyll_mg_m3,front_rank,chlorophyll_component,index_score,algorithm_version,resolution,quality_flags,exclusion,zoning_verified,published_at').order('observed_end',{ascending:false}).limit(200);
-    const counts=await db.rpc('cell_presence_counts',{p_viewer:user.id});assertDb(counts.error,'Jumlah peserta');
-    const countMap=new Map((counts.data||[]).map((x:{cell_id:string,participant_count:number})=>[x.cell_id,Number(x.participant_count)]));
-    const items=(dataOrThrow(q.data,q.error,'Sel lingkungan')||[]).filter(x=>inBbox(x.lon,x.lat,b)).map(x=>({...x,participantCount:countMap.get(x.id)||0,currentScore:!x.exclusion && x.index_score!==null && Date.now()-Date.parse(x.observed_end)<=7*86400000 ? x.index_score:null,legalNote:x.zoning_verified?null:'Aturan penangkapan di lokasi ini belum diverifikasi'}));
+    const q=await db.from('environment_cells').select('id,lon,lat,observed_start,observed_end,source_asset_ids,sst_c,chlorophyll_mg_m3,front_rank,chlorophyll_component,index_score,algorithm_version,resolution,quality_flags,exclusion,zoning_verified,published_at').order('observed_end',{ascending:false}).order('published_at',{ascending:false}).limit(500);
+    const rows=dataOrThrow(q.data,q.error,'Sel lingkungan')||[];
+    const latest=rows[0];
+    const items=rows.filter(x=>latest && x.observed_end===latest.observed_end && x.algorithm_version===latest.algorithm_version && JSON.stringify(x.source_asset_ids)===JSON.stringify(latest.source_asset_ids) && inBbox(x.lon,x.lat,b)).map(x=>({...x,currentScore:!x.exclusion && x.index_score!==null && Date.now()-Date.parse(x.observed_end)<=7*86400000 ? x.index_score:null,legalNote:x.zoning_verified?null:'Aturan penangkapan di lokasi ini belum diverifikasi'}));
     return json({items,unavailableReason:items.length?'': 'Skor belum tersedia: SST dan klorofil-a yang cocok belum diproses.'});
   }
   if(path.join('/')==='data-health' && method==='GET') {

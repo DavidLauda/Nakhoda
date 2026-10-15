@@ -7,7 +7,7 @@ import os
 import pathlib
 import traceback
 import numpy as np
-from pipeline.analysis.environment import VERSION as ENV_VERSION,environmental_index,select_markers
+from pipeline.analysis.environment import VERSION as ENV_VERSION,environmental_index,publishable_positions
 from pipeline.providers import noaa,marine,sentinel
 from pipeline.publish import Publisher,stable_key
 
@@ -62,7 +62,7 @@ def run_marine(pub:Publisher|None):
     cells=[]
     if result['state']=='available':
         area_id=pub.pilot_area() if pub else None;res=grid['resolution_degrees']
-        for y,x in select_markers(result['index'],CONFIG['environment']['max_markers']):
+        for y,x in publishable_positions(result['index'],CONFIG['environment']['max_published_cells']):
             lon=float(grid['longitudes'][x]);lat=float(grid['latitudes'][y]);half=res/2
             cell={'result_key':stable_key(source_ids,CONFIG['aoi_version'],ENV_VERSION,y,x),'area_id':area_id,'geom':f'SRID=4326;POLYGON(({lon-half} {lat-half},{lon+half} {lat-half},{lon+half} {lat+half},{lon-half} {lat+half},{lon-half} {lat-half}))','lon':lon,'lat':lat,'observed_start':min(grid['sst_time'],grid['chl_time']),'observed_end':max(grid['sst_time'],grid['chl_time']),'source_asset_ids':source_ids,'sst_c':float(grid['sst_c'][y,x]),'chlorophyll_mg_m3':float(grid['chl_mg_m3'][y,x]),'front_rank':float(result['front_rank'][y,x]),'chlorophyll_component':float(result['chlorophyll_component'][y,x]),'index_score':int(result['index'][y,x]),'algorithm_version':ENV_VERSION,'resolution':f'{res} degree (~5.5 km)','quality_flags':['zoning_unverified','chlorophyll_gapfilled_l4'],'exclusion':None,'zoning_verified':False}
             cells.append(cell)

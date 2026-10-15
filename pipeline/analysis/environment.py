@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import numpy as np
 
-VERSION = 'environment-index-v0.1'
+VERSION = 'environment-index-v0.2'
 
 def percentile_ranks(values: np.ndarray) -> np.ndarray:
     """Ranks finite values in [0,1], averaging ties; NaN stays NaN."""
@@ -49,12 +49,9 @@ def environmental_index(sst_c: np.ndarray, chl_mg_m3: np.ndarray, latitudes: np.
     score = np.where(eligible,np.rint(100*(0.60*fronts+0.40*component)),np.nan)
     return {'state':'available','index':score,'front_rank':fronts,'chlorophyll_component':component,'eligible':eligible}
 
-def select_markers(scores: np.ndarray, limit: int = 5) -> list[tuple[int,int]]:
-    candidates = np.argwhere(np.isfinite(scores))
-    ordered = sorted((tuple(int(v) for v in p) for p in candidates),key=lambda p:float(scores[p]),reverse=True)
-    selected=[]
-    for y,x in ordered:
-        if all(max(abs(y-a),abs(x-b))>1 for a,b in selected):
-            selected.append((y,x))
-            if len(selected)>=limit: break
-    return selected
+def publishable_positions(scores: np.ndarray, max_cells: int) -> list[tuple[int,int]]:
+    """Keep every measured cell, with an explicit cap on the pilot publication."""
+    positions = np.argwhere(np.isfinite(scores))
+    if len(positions) > max_cells:
+        raise RuntimeError(f'Eligible grid has {len(positions)} cells; bounded publication limit is {max_cells}')
+    return [tuple(int(value) for value in position) for position in positions]
