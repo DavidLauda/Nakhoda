@@ -8,6 +8,8 @@ Juri hackathon masuk dengan satu tombol **Masuk Cepat**, tanpa email, kata sandi
 
 Halaman masuk tidak lagi menyebut akun demo. Form email tim tetap tersedia dalam bagian yang dapat dibuka. Sesi Masuk Cepat tidak dapat dipulihkan setelah keluar atau data browser dihapus.
 
+Navigasi ponsel kini juga memuat tautan **Tinjau**, **Data**, dan **Admin**; bilah navigasi dapat digeser pada layar sempit.
+
 ## Verifikasi lokal
 
 - Halaman masuk menampilkan **Masuk Cepat** dan tidak meminta email.
