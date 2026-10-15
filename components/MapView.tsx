@@ -23,10 +23,10 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
     const install=()=>{
       const source=m.getSource('area-overlays') as GeoJSONSource|undefined;
       if(source)source.setData(areas);else m.addSource('area-overlays',{type:'geojson',data:areas});
-      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','priority'],true],'#1c9b70','#85bda0'],'fill-opacity':0.55}});
-      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':'#176d5d','line-width':1.5,'line-opacity':0.8}});
-      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#d83f4f','Perlindungan Bahari','#9a5b9e','Pemanfaatan','#df9a42','#d83f4f'],'fill-opacity':0.67}});
-      if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':'#6c2645','line-width':2,'line-opacity':0.9}});
+      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','priority'],true],'#14876b','#8fd0b4'],'fill-opacity':0.6}});
+      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':'#0e5c3b','line-width':1.5,'line-opacity':0.8}});
+      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#c8553d','Perlindungan Bahari','#8a5a9e','Pemanfaatan','#f0c24b','#c8553d'],'fill-opacity':0.65}});
+      if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':'#0b2a3c','line-width':2,'line-opacity':0.9}});
     };
     if(m.isStyleLoaded())install();else m.once('load',install);
     const selectConservation=(e:MapLayerMouseEvent)=>{const p=e.features?.[0]?.properties as MapAreaProperties|undefined;if(p)onAreaSelect?.(p);};

@@ -23,18 +23,45 @@ export function FisherPortal(){
   const areas:MapAreas=useMemo(()=>({type:'FeatureCollection',features:[...latestCells.flatMap(c=>{const resolution=Number(c.resolution.match(/^([\d.]+)\s*degree/)?.[1]);if(c.currentScore===null||c.exclusion||!Number.isFinite(resolution)||resolution<=0)return [];const half=resolution/2;return [{type:'Feature' as const,geometry:{type:'Polygon' as const,coordinates:[[[c.lon-half,c.lat-half],[c.lon+half,c.lat-half],[c.lon+half,c.lat+half],[c.lon-half,c.lat+half],[c.lon-half,c.lat-half]]]},properties:{id:c.id,kind:'environment' as const,name:'Sel kondisi perairan',score:c.currentScore,priority:priorityIds.has(c.id),observedEnd:c.observed_end}}];}),...conservation.features]}),[latestCells,priorityIds,conservation]);
   const active=latestCells.find(c=>c.id===selected)||ranked[0];
   const selectArea=useCallback((area:MapAreaProperties)=>{if(area.kind==='conservation')setSelectedZone(area);else{setSelected(area.id);setSelectedZone(null);}},[]);
-  return <section className="page fisher-page"><div className="page-heading"><div><p className="eyebrow">NELAYAN · PETA PERAIRAN</p><h1>Lihat wilayah konservasi dan kondisi laut</h1><p>Sel kondisi laut mencakup Teluk Jakarta dan Kepulauan Seribu. Poligon konservasi yang tersedia hanya mencakup bagian utara Taman Nasional Kepulauan Seribu. Aktifkan GPS untuk melihat posisi Anda.</p></div></div>
-    <div className="notice safety-banner"><strong>Warna hijau menunjukkan perbandingan kondisi perairan, bukan izin memancing atau prediksi tangkapan.</strong> Lapisan konservasi dari BIG mencakup bagian utara Taman Nasional Kepulauan Seribu. Kawasan Kepulauan Seribu Selatan yang ditetapkan KKP pada 2026 belum memiliki poligon dalam lapisan ini. Periksa <a href="https://sidako.kkp.go.id/sidako/map" target="_blank" rel="noreferrer">peta KKP</a> dan aturan setempat sebelum berangkat.</div>
-    <div className="fisher-map-controls"><button className="primary" onClick={tracking?stopGps:startGps}>{tracking?'Hentikan GPS':'Tampilkan lokasi saya'}</button><span>{location?`Lokasi GPS ±${Math.round(location.accuracy)} m · ${new Date(location.at).toLocaleTimeString('id-ID')}`:'Lokasi hanya ditampilkan di perangkat ini setelah Anda mengizinkan GPS.'}</span></div>
-    {gpsError&&<p className="error" role="alert">GPS: {gpsError}</p>}
-    <div className="map-frame fisher-map"><MapView pins={noPins} areas={areas} userLocation={location} onAreaSelect={selectArea}/></div>
-    <div className="map-legend"><span><i className="legend-dot gps-dot"/> Posisi saya</span><span><i className="legend-area priority-area"/> Kondisi relatif tertinggi</span><span><i className="legend-area measured-area"/> Sel terukur lain</span><span><i className="legend-area core-area"/> Zona inti</span><span><i className="legend-area marine-area"/> Perlindungan bahari</span><span><i className="legend-area use-area"/> Pemanfaatan</span></div>
-    <p className="limitation">Poligon konservasi: <a href="https://kspservices.big.go.id/satupeta/rest/services/PUBLIK/SUMBER_DAYA_ALAM_DAN_LINGKUNGAN/MapServer/33" target="_blank" rel="noreferrer">peta zonasi BIG</a>, enam fitur TN Kepulauan Seribu; tanggal pemutakhiran tidak tercantum pada lapisan. Sel hijau Teluk Jakarta dan Kepulauan Seribu hanya ditampilkan bila SST dan klorofil terbaru tersedia serta sel tidak tumpang tindih dengan daratan pada mask Natural Earth 1:10m. Mask ini berskala umum dan bukan peta navigasi. Area tanpa warna berarti belum diklasifikasikan di aplikasi, bukan berarti aman atau boleh dipancing.</p>
-    {zoneError&&<p className="error" role="alert">{zoneError} Periksa peta KKP sebelum berangkat.</p>}
-    {selectedZone&&<div className="panel selected-zone"><span className="eyebrow">RUJUKAN ZONASI BIG</span><h2>{selectedZone.zoneType} · {selectedZone.name}</h2><p>Zona ini termasuk kawasan konservasi. Aturan kegiatan memancing berbeda antar zona dan belum diverifikasi untuk penggunaan operasional di aplikasi.</p><a href="https://sidako.kkp.go.id/sidako/map" target="_blank" rel="noreferrer">Periksa aturan dan peta KKP ↗</a></div>}
-    {error&&<p className="error" role="alert">{error}</p>}
-    <div className="content-grid"><div><h2>Kondisi perairan yang terukur</h2>{ranked.length===0?<div className="empty">Belum ada data SST dan klorofil terbaru yang layak ditampilkan. Lokasi memancing tidak dapat direkomendasikan dari data saat ini.</div>:ranked.slice(0,8).map((c,i)=><button className={`data-card full-button ${active?.id===c.id?'selected-card':''}`} onClick={()=>{setSelected(c.id);setSelectedZone(null);}} key={c.id}><span className="eyebrow">{i===0?'INDEKS RELATIF TERTINGGI':'DATA PERAIRAN'}</span><strong>{c.currentScore}/100 · {c.lat.toFixed(3)}, {c.lon.toFixed(3)}</strong><span>Diamati {when(c.observed_end)}</span><small>SST {c.sst_c??'—'} °C · Klorofil-a {c.chlorophyll_mg_m3??'—'} mg/m³</small><small>{c.legalNote||'Zonasi terverifikasi'} · Bukan peluang hasil tangkap</small></button>)}</div>
-      <div><h2>Detail sel terpilih</h2>{active?<div className="panel"><strong>{active.lat.toFixed(4)}, {active.lon.toFixed(4)}</strong><p>Indeks lingkungan: {active.currentScore??'belum tersedia'}/100. Ini hanya perbandingan SST dan klorofil antar sel pada waktu pengamatan.</p><p>Diamati: {when(active.observed_end)} · Resolusi: {active.resolution}</p><p><strong>Status zonasi:</strong> {active.legalNote||'Terverifikasi pada sumber data'}</p>{active.exclusion&&<p className="error">Dikecualikan: {active.exclusion}</p>}<details><summary>Flag kualitas</summary><pre>{JSON.stringify(active.quality_flags,null,2)}</pre></details><a href={`https://www.openstreetmap.org/?mlat=${active.lat}&mlon=${active.lon}#map=13/${active.lat}/${active.lon}`} target="_blank" rel="noreferrer">Buka koordinat di peta luar ↗</a></div>:<div className="empty">Pilih sel pada peta untuk melihat waktu, kualitas, dan status zonasinya.</div>}
-      <div className="panel"><h2>Sebelum memancing</h2><ol><li>Periksa zona konservasi dan aturan penangkapan pada sumber resmi.</li><li>Periksa cuaca, gelombang, arus, dan keselamatan pelayaran dari layanan resmi.</li><li>Gunakan GPS sebagai orientasi; akurasinya bisa berubah dan peta ini bukan alat navigasi.</li></ol></div></div></div>
+  const rank=active?ranked.findIndex(c=>c.id===active.id):-1;
+  const kkp=<a href="https://sidako.kkp.go.id/sidako/map" target="_blank" rel="noreferrer">peta KKP</a>;
+  return <section className="fisher-app">
+    <div className="fisher-map-wrap">
+      <div className="map-frame fisher-map"><MapView pins={noPins} areas={areas} userLocation={location} onAreaSelect={selectArea}/></div>
+      <div className="map-legend floating" aria-label="Legenda peta"><span><i className="legend-area priority-area"/>Tertinggi</span><span><i className="legend-area measured-area"/>Terukur</span><span><i className="legend-area zone-area"/>Konservasi</span>{location&&<span><i className="legend-dot gps-dot"/>Saya</span>}</div>
+    </div>
+    <div className="fisher-sheet">
+      {error&&<p className="error" role="alert">{error}</p>}
+      {zoneError&&<p className="error" role="alert">{zoneError} Periksa {kkp} sebelum berangkat.</p>}
+      {selectedZone?<div className="sheet-zone">
+        <div className="sheet-head"><div><p className="sheet-kicker">Zona konservasi</p><h2>{selectedZone.zoneType}</h2></div><button className="secondary sheet-close" onClick={()=>setSelectedZone(null)}>Tutup</button></div>
+        <p>{selectedZone.name}. Aturan memancing berbeda tiap zona dan belum diverifikasi di aplikasi ini.</p>
+        <a className="secondary link-button" href="https://sidako.kkp.go.id/sidako/map" target="_blank" rel="noreferrer">Cek aturan di peta KKP ↗</a>
+      </div>:active?<>
+        <div className="sheet-head"><div><p className="sheet-kicker">{rank===0?'Kondisi relatif tertinggi':rank>0?`Peringkat ${rank+1} dari ${ranked.length}`:'Sel terpilih'}</p><h2>{coord(active.lat,'LS','LU')} · {coord(active.lon,'BB','BT')}</h2></div><span className={`score-pill${priorityIds.has(active.id)?' high':''}`}>Skor {active.currentScore??'—'}</span></div>
+        <div className="sheet-stats">
+          <div><span>Suhu laut</span><strong>{active.sst_c===null?'—':`${active.sst_c.toFixed(1)} °C`}</strong></div>
+          <div><span>Klorofil</span><strong>{active.chlorophyll_mg_m3===null?'—':active.chlorophyll_mg_m3.toFixed(2)}</strong></div>
+          <div><span>Data</span><strong>{short(active.observed_end)}</strong></div>
+          <div><span>Zonasi</span><strong>{active.zoning_verified?'Terverifikasi':'Belum dicek'}</strong></div>
+        </div>
+        {active.exclusion&&<p className="error">Dikecualikan: {active.exclusion}</p>}
+        {ranked.length>1&&<div className="top-picks" role="group" aria-label="Area teratas">{ranked.slice(0,3).map((c,i)=><button key={c.id} className={c.id===active.id?'active':''} aria-pressed={c.id===active.id} onClick={()=>{setSelected(c.id);setSelectedZone(null);}}>#{i+1} · {c.currentScore}</button>)}</div>}
+      </>:<div className="empty">Belum ada data suhu laut dan klorofil terbaru. Lokasi memancing tidak dapat direkomendasikan saat ini.</div>}
+      <button className="primary sheet-cta" onClick={tracking?stopGps:startGps}>{tracking?'Hentikan GPS':'Tampilkan lokasi saya'}</button>
+      {gpsError?<p className="error" role="alert">GPS: {gpsError}</p>:location&&<p className="sheet-note">Lokasi ±{Math.round(location.accuracy)} m · {new Date(location.at).toLocaleTimeString('id-ID')} · hanya di perangkat ini</p>}
+      <p className="sheet-note">Skor membandingkan suhu laut dan klorofil, bukan izin memancing atau prediksi tangkapan. Cek {kkp} sebelum berangkat.</p>
+      <details className="sheet-more"><summary>Tentang data & keselamatan</summary>
+        <h3>Sebelum memancing</h3>
+        <ol><li>Periksa zona konservasi dan aturan penangkapan pada sumber resmi.</li><li>Periksa cuaca, gelombang, arus, dan keselamatan pelayaran dari layanan resmi.</li><li>Gunakan GPS sebagai orientasi; akurasinya bisa berubah dan peta ini bukan alat navigasi.</li></ol>
+        <h3>Zonasi</h3>
+        <p>Lapisan konservasi dari <a href="https://kspservices.big.go.id/satupeta/rest/services/PUBLIK/SUMBER_DAYA_ALAM_DAN_LINGKUNGAN/MapServer/33" target="_blank" rel="noreferrer">peta zonasi BIG</a> hanya mencakup bagian utara Taman Nasional Kepulauan Seribu (enam fitur; tanggal pemutakhiran tidak tercantum). Kawasan Kepulauan Seribu Selatan yang ditetapkan KKP pada 2026 belum memiliki poligon di lapisan ini.</p>
+        <h3>Sel perairan</h3>
+        <p>Sel hanya ditampilkan bila suhu laut dan klorofil terbaru tersedia dan sel tidak tumpang tindih dengan daratan pada mask Natural Earth 1:10m. Mask ini berskala umum dan bukan peta navigasi. Area tanpa warna belum diklasifikasikan, bukan berarti aman atau boleh dipancing.</p>
+        {active&&<><h3>Sel terpilih</h3><p>Diamati {when(active.observed_end)} · Resolusi {active.resolution}{active.legalNote?` · ${active.legalNote}`:''}</p><details><summary>Flag kualitas</summary><pre>{JSON.stringify(active.quality_flags,null,2)}</pre></details><a href={`https://www.openstreetmap.org/?mlat=${active.lat}&mlon=${active.lon}#map=13/${active.lat}/${active.lon}`} target="_blank" rel="noreferrer">Buka koordinat di peta luar ↗</a></>}
+      </details>
+    </div>
   </section>;
 }
+const coord=(v:number,neg:string,pos:string)=>`${Math.abs(v).toFixed(3).replace('.',',')}° ${v<0?neg:pos}`;
+const short=(date:string)=>new Intl.DateTimeFormat('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}).format(new Date(date));
