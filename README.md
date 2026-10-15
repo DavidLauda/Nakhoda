@@ -1,6 +1,6 @@
 # Nakhoda
 
-Nakhoda is a Bahasa Indonesia hackathon PWA for a coastal pilot around Jakarta Bay and Kepulauan Seribu. It has two independent quick-entry flows:
+Nakhoda is a Bahasa Indonesia hackathon PWA for a Kepulauan Seribu coastal pilot. It has two independent quick-entry flows:
 
 - **Nelayan:** a real map, optional on-device GPS position, colored conservation reference polygons for the northern national park, and dated 0.05° SST/chlorophyll cells. The relative environmental index is experimental and does **not** prove fish abundance, safe passage, or permission to fish.
 - **Pemerintah:** an ecosystem dashboard summarizing published satellite and ocean data, source health, gaps, and evidence-based next steps. Heat-stress context and optical changes require field verification before any restoration claim.
@@ -25,6 +25,6 @@ The environmental index ranks conditions within available cells and is not a cat
 
 ## Checks and documentation
 
-Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm test`. Pipeline tests are `python -m pytest -q pipeline/tests` when Python dependencies are available. See [demo flow](docs/DEMO.md), [algorithm contract](docs/ALGORITHMS.md), [source notes](docs/SOURCES.md), and [dated map progress](docs/progress/2026-10-15-zone-visualization.md).
+Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm test`. Pipeline tests are `python -m pytest -q pipeline/tests` when Python dependencies are available. See [demo flow](docs/DEMO.md), [algorithm contract](docs/ALGORITHMS.md), [source notes](docs/SOURCES.md), [conservation map progress](docs/progress/2026-10-15-zone-visualization.md), and [Copernicus grid progress](docs/progress/2026-10-15-copernicus-grid-zoning.md).
 
 Keep service-role, provider, and Gmail credentials out of chat, screenshots, client-side variables, and Git. Gmail configuration is optional for the current demo.

@@ -9,7 +9,7 @@ Keep the pilot in Kepulauan Seribu and show a continuous, data-based division of
 ## Changes
 
 - Publish every finite 0.05° Marine index cell in the bounded pilot grid, with a 300-cell safety limit, instead of selecting only five separated cells. The index formula is unchanged.
-- The first full-grid run (`environment-index-v0.2`) published 164 cells, but visual review showed that the broad original pilot envelope colored some coastal mainland. The corrected envelope is `[106.40, -5.95, 106.90, -5.35]`, centered on the Kepulauan Seribu pilot; its AOI and publication versions are `pilot-aoi-v0.2` and `environment-index-v0.3`. This envelope is an operational study boundary, not an official administrative or legal boundary.
+- The first full-grid run (`environment-index-v0.2`) published 164 cells, but visual review showed that the broad original pilot envelope colored some coastal mainland. The corrected envelope is `[106.40, -5.95, 106.90, -5.35]`, centered on the Kepulauan Seribu pilot; its Marine AOI and publication versions are `pilot-aoi-v0.2` and `environment-index-v0.3`. This envelope is an operational study boundary, not an official administrative or legal boundary. The Marine AOI version is scoped separately so the unchanged NOAA and CDSE study-area keys stay stable.
 - Serve only the newest acquisition pair and algorithm version to the app. Older cells remain in the database for provenance but cannot mix visually with the current grid. Scores older than seven days are hidden.
 - Show the grid as clickable map polygons. Dark green identifies the highest 40% of measured cells by relative SST/chlorophyll index; pale green identifies other measured cells. The six BIG conservation polygons remain above the grid, with their source zone types shown separately.
 - Keep the government dashboard's measured-cell count in sync with the same current grid.
@@ -26,7 +26,10 @@ Keep the pilot in Kepulauan Seribu and show a continuous, data-based division of
 - TypeScript typecheck and both Node tests passed; ESLint passed with four pre-existing warnings.
 - The three focused Python environment-index tests passed. Production Next.js build passed with the same four warnings.
 - [GitHub Marine run #3](https://github.com/DavidLauda/Nakhoda/actions/runs/38745940366) succeeded with 164 published cells in version 0.2. The `discovery-metadata` artifact contains 164 unique result keys, SST acquisition `2026-10-14T00:00:00Z`, chlorophyll acquisition `2026-10-13T00:00:00Z`, score range 1–85, and `zoning_unverified` plus `chlorophyll_gapfilled_l4` on every cell. The government dashboard reported 164 current cells after its local preview was restarted.
-- Corrected-envelope Marine run and live map check: pending at the time of this entry; update with actual results after completion.
+- [GitHub Marine run #4](https://github.com/DavidLauda/Nakhoda/actions/runs/38747135203) succeeded and published 80 cells from the corrected envelope. Its artifact contains 80 unique result keys in `environment-index-v0.3`, score range 2–88, centers from 106.475°E to 106.825°E and 5.875°S to 5.425°S, and the same two acquisition times. All 80 cells retain `zoning_unverified` and `chlorophyll_gapfilled_l4` flags.
+- After restarting the local preview, the government dashboard reported **80 current sea cells**, matching the artifact. The fisher map showed a contiguous green grid around the northern conservation reference polygons without coloring the Jakarta mainland. Clicking a green polygon selected the matching cell details. No GPS location was requested or captured.
+
+![Verified Kepulauan Seribu map with current Marine cells and separate conservation zones](assets/2026-10-15-copernicus-grid-map.png)
 
 ## Sources
 

@@ -1,5 +1,6 @@
 {
-  "aoi_version": "pilot-aoi-v0.2",
+  "aoi_version": "pilot-aoi-v0.1",
+  "marine_aoi_version": "pilot-aoi-v0.2",
   "search_bbox_wgs84": [106.40, -5.95, 106.90, -5.35],
   "reef_study_areas": [
     {"code":"pari","name":"Pulau Pari vicinity — candidate study square; habitat unverified","bbox_wgs84":[106.602,-5.870,106.615,-5.857],"habitat_mask":null,"zoning_verified":false},
