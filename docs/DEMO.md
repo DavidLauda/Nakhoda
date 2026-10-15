@@ -4,8 +4,8 @@
 
 1. On the entry screen, choose **Masuk sebagai Nelayan**. No email or password is needed when quick login is enabled.
 2. Open the map and press **Tampilkan lokasi saya**. Permit browser GPS. The blue dot and accuracy label show the device's current position; **Hentikan GPS** removes it. Do this on HTTPS or localhost.
-3. Select a sea-condition point. Explain its date, SST, chlorophyll, relative environmental index, quality flags, and the visible unverified zoning status. If no recent cells exist, show the empty state; do not claim a fishing recommendation.
-4. Open the linked official KKP conservation map to check restrictions manually. Explain that Nakhoda cannot yet certify an in-app legal fishing zone because verified zone polygons have not been imported. Check weather and vessel safety separately.
+3. Point out the color legend: green squares are 0.05° sea cells with recent SST/chlorophyll data; red, purple, and amber polygons are northern national-park zones from BIG. Tap a polygon to see its source zone label, or a green cell to see its date, SST, chlorophyll, relative index, and quality flags. Green is not fishing permission or a catch prediction.
+4. Open the linked KKP conservation map to check restrictions manually. Explain that the current BIG layer does not cover the 2026 South Kepulauan Seribu designation and that zone-specific activity rules have not been validated for operational guidance. Uncolored water is unclassified, not automatically open to fishing. Check weather and vessel safety separately.
 
 ## Pemerintah
 
