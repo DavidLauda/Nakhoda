@@ -1,0 +1,184 @@
+{
+  "kind": "verified_local_source_probe",
+  "notice": "Genuine NOAA data processed locally; not a live or Supabase-published observation. It never appears in authenticated live map layers.",
+  "database_published": false,
+  "acquisition_date": "20261012",
+  "processed_at": "2026-10-14T10:03:56.359463+00:00",
+  "source_name": "NOAA Coral Reef Watch",
+  "source_product_id": "CRW_5km_v3.1_daily",
+  "algorithm_version": "crw-heat-v0.1",
+  "source_urls": {
+    "sst": "https://www.star.nesdis.noaa.gov/pub/socd/mecb/crw/data/5km/v3.1_op/nc/v1.0/daily/sst/2026/coraltemp_v3.1_20261012.nc",
+    "hotspot": "https://www.star.nesdis.noaa.gov/pub/socd/mecb/crw/data/5km/v3.1_op/nc/v1.0/daily/hs/2026/ct5km_hs_v3.1_20261012.nc",
+    "dhw": "https://www.star.nesdis.noaa.gov/pub/socd/mecb/crw/data/5km/v3.1_op/nc/v1.0/daily/dhw/2026/ct5km_dhw_v3.1_20261012.nc",
+    "alert_7day": "https://www.star.nesdis.noaa.gov/pub/socd/mecb/crw/data/5km/v3.1_op/nc/v1.0/daily/baa5-max-7d/2026/ct5km_baa5-max-7d_v3.1_20261012.nc"
+  },
+  "source_sha256": {
+    "coraltemp_v3.1_20261012.nc": "49557d989c731bcb9463ab7e72ae0d0160c745e7b65e0837b736a6fead4953ec",
+    "ct5km_baa5-max-7d_v3.1_20261012.nc": "d707c55ad898be4dbe3a994dd445c34b87c7f4bb75353e343ceb104144380bc1",
+    "ct5km_dhw_v3.1_20261012.nc": "48f293a8ed1adf732c0742890bf6b813174a8a10b47411c162affb3d04c27c02",
+    "ct5km_hs_v3.1_20261012.nc": "6947c452e020cf8826f19533b806df82a78897f3b002be5af4e2ddb1b3a5c34a"
+  },
+  "areas": [
+    {
+      "area": "pari",
+      "state": "usable_local_only",
+      "lon": 106.60849999999999,
+      "lat": -5.8635,
+      "observed_start": "2026-10-06T12:00:00+00:00",
+      "observed_end": "2026-10-12T12:00:00+00:00",
+      "metrics": {
+        "sst": {
+          "value": 29.62,
+          "variable": "analysed_sst",
+          "units": "degrees_celsius",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.875,
+          "attributes": {
+            "long_name": "analysed sea surface temperature",
+            "standard_name": "sea_surface_temperature",
+            "valid_max": "5000",
+            "valid_min": "-200"
+          }
+        },
+        "hotspot": {
+          "value": 0.23,
+          "variable": "hotspot",
+          "units": "degrees_celsius",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.875,
+          "attributes": {
+            "long_name": "coral bleaching hotspot",
+            "standard_name": "N/A",
+            "valid_max": "1500",
+            "valid_min": "-1500"
+          }
+        },
+        "dhw": {
+          "value": 0.0,
+          "variable": "degree_heating_week",
+          "units": "degree_celsius_weeks",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.875,
+          "attributes": {
+            "long_name": "degree heating week",
+            "standard_name": "N/A",
+            "valid_max": "10000",
+            "valid_min": "0"
+          }
+        },
+        "alert_7day": {
+          "value": 1.0,
+          "variable": "bleaching_alert_area",
+          "units": "stress_level",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.875,
+          "attributes": {
+            "long_name": "bleaching alert area 7-day maximum composite",
+            "standard_name": "N/A",
+            "valid_max": "7",
+            "valid_min": "0"
+          },
+          "observed_start": "2026-10-06T12:00:00+00:00",
+          "observed_end": "2026-10-12T12:00:00+00:00"
+        }
+      },
+      "source_asset_ids": [
+        "coraltemp_v3.1_20261012.nc",
+        "ct5km_hs_v3.1_20261012.nc",
+        "ct5km_dhw_v3.1_20261012.nc",
+        "ct5km_baa5-max-7d_v3.1_20261012.nc"
+      ],
+      "coverage_fraction": 1.0,
+      "quality_flags": [
+        "grid_point_context_not_reef_scale"
+      ],
+      "limitations": "NOAA 0.05° heat stress is regional context, not direct evidence of bleaching at the reef. Alert is an official 7-day maximum composite; SST, HotSpot and DHW are daily.",
+      "source_url": "https://coralreefwatch.noaa.gov/product/5km/"
+    },
+    {
+      "area": "pramuka",
+      "state": "usable_local_only",
+      "lon": 106.6135,
+      "lat": -5.7465,
+      "observed_start": "2026-10-06T12:00:00+00:00",
+      "observed_end": "2026-10-12T12:00:00+00:00",
+      "metrics": {
+        "sst": {
+          "value": 29.56,
+          "variable": "analysed_sst",
+          "units": "degrees_celsius",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.724999904632568,
+          "attributes": {
+            "long_name": "analysed sea surface temperature",
+            "standard_name": "sea_surface_temperature",
+            "valid_max": "5000",
+            "valid_min": "-200"
+          }
+        },
+        "hotspot": {
+          "value": 0.19,
+          "variable": "hotspot",
+          "units": "degrees_celsius",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.724999904632568,
+          "attributes": {
+            "long_name": "coral bleaching hotspot",
+            "standard_name": "N/A",
+            "valid_max": "1500",
+            "valid_min": "-1500"
+          }
+        },
+        "dhw": {
+          "value": 0.0,
+          "variable": "degree_heating_week",
+          "units": "degree_celsius_weeks",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.724999904632568,
+          "attributes": {
+            "long_name": "degree heating week",
+            "standard_name": "N/A",
+            "valid_max": "10000",
+            "valid_min": "0"
+          }
+        },
+        "alert_7day": {
+          "value": 1.0,
+          "variable": "bleaching_alert_area",
+          "units": "stress_level",
+          "source_time": "2026-10-12T12:00:00.000000000",
+          "native_lon": 106.625,
+          "native_lat": -5.724999904632568,
+          "attributes": {
+            "long_name": "bleaching alert area 7-day maximum composite",
+            "standard_name": "N/A",
+            "valid_max": "7",
+            "valid_min": "0"
+          },
+          "observed_start": "2026-10-06T12:00:00+00:00",
+          "observed_end": "2026-10-12T12:00:00+00:00"
+        }
+      },
+      "source_asset_ids": [
+        "coraltemp_v3.1_20261012.nc",
+        "ct5km_hs_v3.1_20261012.nc",
+        "ct5km_dhw_v3.1_20261012.nc",
+        "ct5km_baa5-max-7d_v3.1_20261012.nc"
+      ],
+      "coverage_fraction": 1.0,
+      "quality_flags": [
+        "grid_point_context_not_reef_scale"
+      ],
+      "limitations": "NOAA 0.05° heat stress is regional context, not direct evidence of bleaching at the reef. Alert is an official 7-day maximum composite; SST, HotSpot and DHW are daily.",
+      "source_url": "https://coralreefwatch.noaa.gov/product/5km/"
+    }
+  ]
+}

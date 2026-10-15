@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+__pycache__/
+.pytest_cache/
+pipeline/out/
+pipeline/data/
+pipeline/test-tmp/

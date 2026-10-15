@@ -1,0 +1,9 @@
+numpy>=2.1,<3
+xarray>=2025.1,<2027
+netCDF4>=1.7,<2
+requests>=2.32,<3
+copernicusmarine>=2.2,<3
+rasterio>=1.4,<2
+scipy>=1.14,<2
+Pillow>=11,<13
+pytest>=8,<10
