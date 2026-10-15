@@ -39,7 +39,7 @@ export function FisherPortal(){
   return <section className="fisher-app">
     <div className="fisher-map-wrap">
       <div className="map-frame fisher-map"><MapView pins={noPins} areas={areas} userLocation={location} onAreaSelect={selectArea} selectedId={selectedZone?undefined:active?.id} focus={focus}/></div>
-      <div className="map-legend floating" aria-label="Legenda peta"><span><i className="legend-area priority-area"/>Tertinggi</span><span><i className="legend-area measured-area"/>Terukur</span><span><i className="legend-area zone-area"/>Konservasi</span>{location&&<span><i className="legend-dot gps-dot"/>Saya</span>}</div>
+      <div className="map-legend floating" aria-label="Arti warna peta"><strong className="legend-heading">Arti warna peta</strong><span><i className="legend-area priority-area"/>Hijau tua: skor laut lebih tinggi</span><span><i className="legend-area measured-area"/>Hijau muda: skor laut lebih rendah</span><span className="legend-wide"><i className="legend-area zone-area"/>Merah, ungu, kuning: kawasan konservasi</span>{location&&<span className="legend-wide"><i className="legend-dot gps-dot"/>Titik biru: lokasi saya</span>}<small className="legend-explain">Skor membandingkan suhu air dan klorofil antar petak, bukan jumlah ikan.</small></div>
     </div>
     <div className="fisher-sheet">
       {error&&<p className="error" role="alert">{error}</p>}
@@ -50,7 +50,7 @@ export function FisherPortal(){
         <p>{selectedZone.name}. Aturan memancing berbeda tiap zona dan belum diverifikasi di aplikasi ini.</p>
         <a className="secondary link-button" href="https://sidako.kkp.go.id/sidako/map" target="_blank" rel="noreferrer">Cek aturan di peta KKP ↗</a>
       </div>:active?<>
-        <div className="sheet-head"><div><p className="sheet-kicker">{rank===0?'Kondisi relatif tertinggi':rank>0?`Peringkat ${rank+1} dari ${recommended.length}`:'Sel terpilih'}</p><h2>{coord(active.lat,'LS','LU')} · {coord(active.lon,'BB','BT')}</h2></div><span className={`score-pill${priorityIds.has(active.id)?' high':''}`}>Skor {active.currentScore??'—'}</span></div>
+        <div className="sheet-head"><div><p className="sheet-kicker">{rank===0?'Skor laut tertinggi di peta':rank>0?`Skor laut urutan ${rank+1} dari ${recommended.length}`:'Petak laut terpilih'}</p><h2>{coord(active.lat,'LS','LU')} · {coord(active.lon,'BB','BT')}</h2></div><span className={`score-pill${priorityIds.has(active.id)?' high':''}`}>Skor {active.currentScore??'—'}/100</span></div>
         {location&&<p className="distance-line">{km(distanceKm(location,active))} km · arah {compassId(bearingDeg(location,active))} dari posisi Anda</p>}
         {activeZones?.has('Inti')?<div className="zone-alert danger"><strong>Bertumpuk dengan Zona Inti</strong><span>Tidak direkomendasikan. Zona inti umumnya tertutup untuk penangkapan.</span></div>:activeZones&&activeZones.size>0&&<div className="zone-alert"><strong>Bertumpuk dengan Zona {[...activeZones].join(' / ')}</strong><span>Cek aturan memancing di {kkp}.</span></div>}
         <div className="sheet-stats">
@@ -60,12 +60,12 @@ export function FisherPortal(){
           <div><span>Zonasi</span><strong>{active.zoning_verified?'Terverifikasi':'Belum dicek'}</strong></div>
         </div>
         {active.exclusion&&<p className="error">Dikecualikan: {active.exclusion}</p>}
-        {recommended.length>1&&<div className="top-picks" role="group" aria-label="Area teratas">{recommended.slice(0,3).map((c,i)=><button key={c.id} className={c.id===active.id?'active':''} aria-pressed={c.id===active.id} onClick={()=>choose(c)}>#{i+1} · {c.currentScore}</button>)}</div>}
-        {nearest&&nearest.c.id!==active.id&&<button className="secondary nearest-button" onClick={()=>choose(nearest.c)}>Terdekat yang bagus · {km(nearest.d)} km · skor {nearest.c.currentScore}</button>}
+        {recommended.length>1&&<div className="top-picks" role="group" aria-label="Petak dengan skor laut tertinggi">{recommended.slice(0,3).map((c,i)=><button key={c.id} className={c.id===active.id?'active':''} aria-pressed={c.id===active.id} onClick={()=>choose(c)}>Urutan {i+1} · {c.currentScore}/100</button>)}</div>}
+        {nearest&&nearest.c.id!==active.id&&<button className="secondary nearest-button" onClick={()=>choose(nearest.c)}>Petak berskor tinggi terdekat · {km(nearest.d)} km</button>}
       </>:<div className="empty">Belum ada data suhu laut dan klorofil terbaru. Lokasi memancing tidak dapat direkomendasikan saat ini.</div>}
       <button className="primary sheet-cta" onClick={tracking?stopGps:startGps}>{tracking?'Hentikan GPS':'Tampilkan lokasi saya'}</button>
       {gpsError?<p className="error" role="alert">GPS: {gpsError}</p>:location&&<p className="sheet-note">Lokasi ±{Math.round(location.accuracy)} m · {new Date(location.at).toLocaleTimeString('id-ID')} · hanya di perangkat ini</p>}
-      <p className="sheet-note">Skor membandingkan suhu laut dan klorofil, bukan izin memancing atau prediksi tangkapan. Cek {kkp} sebelum berangkat.</p>
+      <p className="sheet-note">Skor 0–100 membandingkan pola suhu air dan klorofil (petunjuk plankton) antar petak laut yang punya data. Skor tinggi tidak menjamin banyak ikan. Warna hijau bukan izin memancing; cek {kkp} sebelum berangkat.</p>
       <details className="sheet-more"><summary>Tentang data & keselamatan</summary>
         <h3>Sebelum memancing</h3>
         <ol><li>Periksa zona konservasi dan aturan penangkapan pada sumber resmi.</li><li>Periksa cuaca, gelombang, arus, dan keselamatan pelayaran dari layanan resmi.</li><li>Gunakan GPS sebagai orientasi; akurasinya bisa berubah dan peta ini bukan alat navigasi.</li></ol>
