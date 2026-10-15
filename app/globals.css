@@ -1,5 +1,5 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
-:root{--navy:#0b2a3c;--teal:#0b7a84;--teal-dark:#086068;--teal-tint:#d6eef0;--sea-tint:#cfe3ea;--paper:#eef4f5;--ink:#0f2b38;--muted:#4b6573;--line:#d5e2e5;--line-strong:#b9cdd3;--white:#fff;--green:#14876b;--green-tint:#ddf1e8;--green-ink:#0e5c3b;--amber:#f0c24b;--amber-tint:#fbefc8;--amber-ink:#5c4300;--red:#c8553d;--red-strong:#b4432d;--red-tint:#fbe6e0;--red-ink:#7a2a18;--on-navy:#d5e6eb;--on-navy-muted:#b9d3db;--display:var(--font-display),'Bricolage Grotesque',system-ui,sans-serif;--body:var(--font-body),'Plus Jakarta Sans',system-ui,sans-serif}
+:root{--navy:#0b2a3c;--teal:#0b7a84;--teal-dark:#086068;--teal-tint:#d6eef0;--sea-tint:#cfe3ea;--paper:#eef4f5;--ink:#0f2b38;--muted:#4b6573;--line:#d5e2e5;--line-strong:#b9cdd3;--white:#fff;--green:#14876b;--green-tint:#ddf1e8;--green-ink:#0e5c3b;--amber:#f0c24b;--amber-tint:#fbefc8;--amber-ink:#5c4300;--red:#c8553d;--red-strong:#b4432d;--red-tint:#fbe6e0;--red-ink:#7a2a18;--on-navy:#d5e6eb;--on-navy-muted:#b9d3db;--display:'Bricolage Grotesque Variable',system-ui,sans-serif;--body:'Plus Jakarta Sans Variable',system-ui,sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;max-width:100%;overflow-x:clip}
 body{font-family:var(--body);color:var(--ink);background:var(--paper);line-height:1.5}

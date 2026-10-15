@@ -10,7 +10,8 @@ The UI was restyled after the "NAKHODA Mockup Peran" design (fisher: mobile-firs
 
 ### 1. Visual system (all pages)
 - Design tokens in `app/globals.css`: navy `#0b2a3c`, teal `#0b7a84`, pale sea `#eef4f5`, plus green/amber/red tints for status. Every existing class name was kept, so legacy views inherit the look.
-- Fonts via `next/font/google` in `app/layout.tsx`: Bricolage Grotesque (headings) and Plus Jakarta Sans (body). Theme colour updated in `app/layout.tsx` and `app/manifest.ts`.
+- Fonts: Bricolage Grotesque (headings) and Plus Jakarta Sans (body), self-hosted through `@fontsource-variable/bricolage-grotesque` and `@fontsource-variable/plus-jakarta-sans` (OFL), imported in `app/layout.tsx`. Theme colour updated in `app/layout.tsx` and `app/manifest.ts`.
+- Fix (16 Oct): the first version used `next/font/google`, which downloads fonts at build time. GitHub Actions `npm run build` failed with `TypeError: Cannot read properties of null (reading '1')` in `next/font` because Google Fonts can return font URLs without a file extension to the CI runner. Self-hosting removes the build-time network dependency; the build now emits the woff2 files into `.next/static/media` and references no Google Fonts URL. This also keeps fonts available offline in the PWA.
 - App shell (`components/PesisirApp.tsx`): navy sidebar with icons and `aria-current` on the active page; navy top bar on phones; icon bottom navigation; online/offline dot. Unicode glyph icons (◉ ⌖ ▥) were replaced by inline stroke SVG icons.
 - Login: navy background, portal cards with icon tiles.
 - Map colours (`components/MapView.tsx`) aligned with the palette: highest cells `#14876b`, other measured cells `#8fd0b4`, core zone `#c8553d`, marine protection `#8a5a9e`, utilisation `#f0c24b`.
