@@ -32,6 +32,9 @@ test('cell intersection finds partial overlap and the containing zone',()=>{
   const zones=[{geometry:{type:'Polygon',coordinates:[square(106.5,-5.8,106.6,-5.7)]},properties:{zoneType:'Inti'}}];
   assert.equal(zoneAt(106.55,-5.75,zones)?.properties.zoneType,'Inti');
   assert.equal(zoneAt(106.7,-5.75,zones),undefined);
+  const nested=[{geometry:{type:'Polygon',coordinates:[square(106.4,-5.9,106.7,-5.6)]},properties:{zoneType:'Pemanfaatan Terbatas'}},...zones];
+  assert.equal(zoneAt(106.55,-5.75,nested)?.properties.zoneType,'Inti');
+  assert.equal(zoneAt(106.65,-5.75,nested)?.properties.zoneType,'Pemanfaatan Terbatas');
   assert.deepEqual([...cellZoneTypes({lon:106.62,lat:-5.75},0.025,zones)],['Inti']);
   assert.equal(cellZoneTypes({lon:106.7,lat:-5.75},0.025,zones).size,0);
 });

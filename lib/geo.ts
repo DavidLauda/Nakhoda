@@ -23,8 +23,12 @@ export function pointInArea(lon:number,lat:number,geometry:AreaGeometry) {
   const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.coordinates;
   return polygons.some(([outer,...holes])=>!!outer&&inRing(lon,lat,outer)&&!holes.some(h=>inRing(lon,lat,h)));
 }
+const zoneRank:Record<string,number>={Inti:3,'Perlindungan Bahari':2};
+/** The most restrictive zone containing the point; nested zones (a core inside its area boundary) resolve to the core. */
 export function zoneAt<F extends ZoneFeature>(lon:number,lat:number,features:F[]):F|undefined {
-  return features.find(f=>pointInArea(lon,lat,f.geometry));
+  let best:F|undefined;
+  for(const f of features)if(pointInArea(lon,lat,f.geometry)&&(!best||(zoneRank[f.properties.zoneType??'']??1)>(zoneRank[best.properties.zoneType??'']??1)))best=f;
+  return best;
 }
 function segmentTouchesBox(a:number[],b:number[],west:number,south:number,east:number,north:number) {
   let near=0,far=1;

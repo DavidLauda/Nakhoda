@@ -1,7 +1,7 @@
 import type { MapAreas } from '../components/MapView';
 import { pointInArea, type AreaGeometry } from './geo.ts';
 
-export type ConservationGridCell=[number,number,'Inti'|'Perlindungan Bahari'|'Pemanfaatan',string,number];
+export type ConservationGridCell=[number,number,'Inti'|'Perlindungan Bahari'|'Pemanfaatan'|'Pemanfaatan Terbatas',string,number|string];
 export type ConservationGrid={origin:[number,number];resolutions:Record<string,ConservationGridCell[]>};
 export type SeaGrid={origin:[number,number];step:number;cells:Array<[number,number,AreaGeometry?]>;source?:string};
 export type DisplayCell={id:string;lon:number;lat:number;resolution:string;currentScore:number|null;exclusion:string|null;observed_start?:string;observed_end:string;sst_c:number|null;chlorophyll_mg_m3:number|null};

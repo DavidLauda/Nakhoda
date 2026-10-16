@@ -4,7 +4,7 @@ import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
 
 export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string};
-export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
+export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
 export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
 const emptyAreas:MapAreas={type:'FeatureCollection',features:[]};
@@ -31,7 +31,7 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
       appliedAreas.current=areas;
       if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','coverage'],'unknown'],'#cbd5e1',['==',['get','coverage'],'estimate'],'#66a9cf',['==',['get','priority'],true],'#14876b','#8fd0b4'],'fill-opacity':0.6}});
       if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':['match',['get','coverage'],'unknown','#94a3b8','estimate','#397b9c','#0e5c3b'],'line-width':1,'line-opacity':0.7}});
-      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#c8553d','Perlindungan Bahari','#8a5a9e','Pemanfaatan','#f0c24b','#c8553d'],'fill-opacity':0.65}});
+      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#c8553d','Perlindungan Bahari','#8a5a9e','Pemanfaatan','#f0c24b','Pemanfaatan Terbatas','#f0c24b','#c8553d'],'fill-opacity':0.65}});
       if(!m.getLayer('environment-selected'))m.addLayer({id:'environment-selected',type:'line',source:'area-overlays',filter:selectedFilter(selectedRef.current),paint:{'line-color':'#0b2a3c','line-width':3.5}});
       if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':'#0b2a3c','line-width':2,'line-opacity':0.9}});
       applySelected(m,selectedRef.current);

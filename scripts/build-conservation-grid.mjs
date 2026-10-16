@@ -2,9 +2,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { cellIntersectsArea } from '../lib/geo.ts';
 
 const pilot=JSON.parse(readFileSync(new URL('../pipeline/config/pilot.json',import.meta.url),'utf8'));
-const source=JSON.parse(readFileSync(new URL('../public/conservation-north-big.geojson',import.meta.url),'utf8'));
+const read=file=>JSON.parse(readFileSync(new URL(`../public/${file}`,import.meta.url),'utf8'));
+const source={features:['conservation-north-big.geojson','conservation-south-kkp-2026.geojson'].flatMap(file=>read(file).features)};
 const [west,south,east,north]=pilot.search_bbox_wgs84;
-const precedence={Pemanfaatan:1,'Perlindungan Bahari':2,Inti:3};
+const precedence={Pemanfaatan:1,'Pemanfaatan Terbatas':1,'Perlindungan Bahari':2,Inti:3};
 const resolutions={};
 
 for(const step of [0.01,0.05]){
@@ -24,7 +25,7 @@ for(const step of [0.01,0.05]){
         if(!cellIntersectsArea(center,step/2,{type:'Polygon',coordinates:polygon}))continue;
         const key=`${x},${y}`,old=cells.get(key);
         if(!old||precedence[feature.properties.zoneType]>precedence[old[2]]){
-          cells.set(key,[x,y,feature.properties.zoneType,feature.properties.name,feature.properties.sourceFeatureId]);
+          cells.set(key,[x,y,feature.properties.zoneType,feature.properties.name,feature.properties.sourceFeatureId??feature.properties.id]);
         }
       }
     }
