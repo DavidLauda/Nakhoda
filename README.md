@@ -33,4 +33,4 @@ The environmental index ranks conditions within available cells and is not a cat
 
 Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm test`. Pipeline tests are `python -m pytest -q pipeline/tests` when Python dependencies are available. See [demo flow](docs/DEMO.md), [quick-login setup for clones](docs/progress/2026-10-15-quick-login-for-all-clones.md), [algorithm contract](docs/ALGORITHMS.md), [source notes](docs/SOURCES.md), [conservation map progress](docs/progress/2026-10-15-zone-visualization.md), and [Copernicus grid progress](docs/progress/2026-10-15-copernicus-grid-zoning.md).
 
-Keep service-role, provider, and Gmail credentials out of chat, screenshots, client-side variables, and Git. Gmail configuration is optional for the current demo.
+Keep service-role and provider credentials out of chat, screenshots, client-side variables, and Git. Case assessments are managed directly on satellite indication pages; the email feature has been removed.

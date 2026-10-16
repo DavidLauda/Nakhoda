@@ -62,7 +62,7 @@ Pilih cakupan **Production**. Tambahkan **Preview** jika ingin menguji deploymen
 Untuk demo utama saat ini:
 
 - `NEXT_PUBLIC_MAP_STYLE_URL` bersifat opsional; tanpa nilai ini peta memakai tile OpenStreetMap bawaan.
-- Variabel Gmail, `EMAIL_SENDER`, dan konfigurasi email tidak diperlukan untuk flow utama nelayan dan pemerintah.
+- Fitur email sudah dihapus. Variabel Gmail dan `EMAIL_SENDER` tidak digunakan aplikasi.
 - `APP_BASE_URL` belum dibaca oleh kode aplikasi saat panduan ini dibuat, sehingga bukan syarat deployment ini.
 - Variabel CDSE dan Copernicus Marine ditempatkan di GitHub Actions seperti dijelaskan pada langkah 7.
 

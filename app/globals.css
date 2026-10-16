@@ -362,3 +362,11 @@ details summary{cursor:pointer;font-weight:600;color:var(--teal)}
 .summary-tiles strong{font-size:1.25rem}
 .map-pin.with-text{width:auto;height:auto;border-radius:999px;border:2px solid #fff;background:var(--navy);color:#fff;font:700 11px/1 var(--body);padding:4px 8px;white-space:nowrap}
 .legend-label{display:inline-block;background:var(--navy);color:#fff;border-radius:999px;padding:2px 7px;font-size:.7rem;margin-right:4px}
+
+.indication-review fieldset{border:0;padding:0;margin:0;min-width:0}
+.indication-review label{margin-top:0;margin-bottom:14px}
+.indication-review small{font-weight:400;line-height:1.5}
+
+.preserve-lines,.timeline li>span{white-space:pre-wrap;overflow-wrap:anywhere}
+
+@media(max-width:900px){.indication-layout>.review-side{grid-row:1}}

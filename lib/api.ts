@@ -3,15 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { ApiError, assertDb, bbox, failure, identity, inBbox, json, pilotAreaId, reviewer, serviceDb, timestamp, validPilotPoint } from './server';
-import { allowedRecipient, contentHash, emailMode, sendGmail } from './email';
-import { PLAYBOOK_VERSION, recommendation } from './playbook';
 import { snap250, presenceIsFresh } from './geo';
 import { OPEN_STATUSES, REVIEW_ACTIONS, problemCell } from './review';
+import { caseReviewSchema } from './case-review';
 
 const uuid=z.string().uuid();
 const reportSchema=z.object({clientId:uuid,category:z.enum(['coral_concern','mangrove_damage','shoreline_erosion','marine_waste','water_pollution','other']),lon:z.number(),lat:z.number(),locationMethod:z.enum(['gps','manual']),accuracyM:z.number().nonnegative().optional(),observedAt:z.string(),description:z.string().min(10).max(4000),textOnlyReason:z.string().max(500).optional()});
 const tripPointSchema=z.object({clientId:uuid,lon:z.number(),lat:z.number(),recordedAt:z.string(),accuracyM:z.number().min(0).max(100000),gap:z.boolean().optional()});
-const statuses=['new','reviewing','ready_for_referral','referred','acknowledged','in_progress','resolved','closed_without_resolution'] as const;
 
 async function body<T extends z.ZodTypeAny>(request:NextRequest,schema:T):Promise<z.infer<T>> {
   let parsed:unknown;
@@ -22,14 +20,13 @@ async function body<T extends z.ZodTypeAny>(request:NextRequest,schema:T):Promis
 }
 function dataOrThrow<T>(data:T,error:{message:string}|null,context:string):T { assertDb(error,context); return data; }
 function ensureOwner(owner:string,user:string) { if(owner!==user) throw new ApiError(403,'owner_forbidden','Hanya pemilik yang dapat mengakses data ini.'); }
-function safeDate(value:string) { return new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'}).format(new Date(value)); }
 
 export async function handleApi(request:NextRequest,method:string,path:string[]):Promise<NextResponse> {
   try { return await dispatch(request,method,path); } catch(error) { return failure(error); }
 }
 
 async function dispatch(request:NextRequest,method:string,path:string[]):Promise<NextResponse> {
-  if(path.join('/')==='health' && method==='GET') return json({configured:{supabase:!!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),gmail:!!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN && process.env.EMAIL_SENDER),emailTestRecipients:(process.env.EMAIL_TEST_ALLOWLIST||'').split(',').filter(Boolean).length},emailMode:emailMode()});
+  if(path.join('/')==='health' && method==='GET') return json({configured:{supabase:!!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)}});
   const user=await identity(request), db=serviceDb();
   if(path.join('/')==='me' && method==='GET') return json({user});
 
@@ -46,7 +43,11 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
       const signed=await db.storage.from('analysis-artifacts').createSignedUrl(key,300);
       if(!signed.error) manifest[`${kind}_url`]=signed.data.signedUrl;
     }
-    return json({item:{...q.data,manifest}});
+    const link=await db.from('case_evidence').select('case_id').eq('observation_id',q.data.id).limit(1).maybeSingle();
+    assertDb(link.error,'Penilaian observasi');
+    const review=link.data?await db.from('cases').select('status,priority,public_note,updated_at').eq('id',link.data.case_id).maybeSingle():null;
+    if(review)assertDb(review.error,'Catatan untuk nelayan');
+    return json({item:{...q.data,manifest},review:review?.data||null});
   }
   if(path[0]==='environment-cells' && method==='GET') {
     const b=bbox(request.nextUrl.searchParams.get('bbox'));
@@ -144,22 +145,35 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
       return json({sharing:true,approximatePosition:snapped,expiresAfterSeconds:180});
     }
   }
-  if(path[0]==='review' && path[1]==='indications' && path[2] && path[3]==='case' && method==='POST') {
+  if(path[0]==='review' && path[1]==='indications' && path[2] && path[3]==='case' && path.length===4 && ['GET','POST'].includes(method)) {
     const areaId=await pilotAreaId();
     await reviewer(user,areaId);
     const o=await db.from('observations').select('id,type,lon,lat,observed_end,area_id').eq('id',path[2]).eq('state','published').maybeSingle();
     assertDb(o.error,'Observasi');
     if(!o.data||o.data.area_id!==areaId) throw new ApiError(404,'not_found','Observasi tidak ditemukan.');
-    const existing=await db.from('case_evidence').select('case_id').eq('observation_id',o.data.id).maybeSingle();
+    const existing=await db.from('case_evidence').select('case_id').eq('observation_id',o.data.id).limit(1).maybeSingle();
     assertDb(existing.error,'Kasus');
-    if(existing.data) return json({caseId:existing.data.case_id,alreadyExisted:true});
+    if(existing.data){
+      const record=await db.from('cases').select('*').eq('id',existing.data.case_id).single();
+      assertDb(record.error,'Penilaian');await reviewer(user,record.data!.area_id);
+      if(method==='POST')return json({caseId:existing.data.case_id,item:record.data,alreadyExisted:true});
+      const audit=await db.from('audit_events').select('id,action,reason,metadata,created_at').eq('entity_type','case').eq('entity_id',existing.data.case_id).in('action',['review_update','created_from_observation','created_from_report']).order('created_at',{ascending:false});
+      assertDb(audit.error,'Riwayat penilaian');
+      return json({item:record.data,audit:audit.data||[]});
+    }
+    if(method==='GET')return json({item:null,audit:[]});
     const cell=problemCell(o.data.lon,o.data.lat);
-    const created=await db.from('cases').insert({area_id:areaId,category:o.data.type==='heat_stress'?'coral_concern':'satellite_optical_change',title:`Indikasi satelit · sel ${cell.code} · ${o.data.type==='heat_stress'?'panas karang':'perubahan optik'}`,status:'reviewing',recommendation_rule:'manual_review'}).select('id').single();
+    const created=await db.from('cases').upsert({id:o.data.id,area_id:areaId,category:o.data.type==='heat_stress'?'coral_concern':'satellite_optical_change',title:`Indikasi satelit · sel ${cell.code} · ${o.data.type==='heat_stress'?'panas karang':'perubahan optik'}`,status:'reviewing',recommendation_rule:'manual_review'},{onConflict:'id',ignoreDuplicates:true}).select('*').maybeSingle();
     assertDb(created.error,'Buat kasus');
-    const evidence=await db.from('case_evidence').insert({case_id:created.data!.id,observation_id:o.data.id});
+    const record=created.data?created:await db.from('cases').select('*').eq('id',o.data.id).single();
+    assertDb(record.error,'Penilaian');
+    const evidence=await db.from('case_evidence').upsert({case_id:record.data!.id,observation_id:o.data.id},{onConflict:'case_id,observation_id',ignoreDuplicates:true});
     assertDb(evidence.error,'Bukti kasus');
-    await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:created.data!.id,action:'created_from_observation',metadata:{observation_id:o.data.id}});
-    return json({caseId:created.data!.id},201);
+    if(created.data){
+      const audit=await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:record.data!.id,action:'created_from_observation',metadata:{observation_id:o.data.id}});
+      assertDb(audit.error,'Riwayat penilaian');
+    }
+    return json({caseId:record.data!.id,item:record.data,alreadyExisted:!created.data},created.data?201:200);
   }
   if(path[0]==='review' && path[1]==='reports') {
     const areaId=await pilotAreaId();
@@ -295,100 +309,32 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
     }
     const c=await db.from('cases').select('*').eq('id',path[1]).maybeSingle();assertDb(c.error,'Kasus');if(!c.data) throw new ApiError(404,'not_found','Kasus tidak ditemukan.');await reviewer(user,c.data.area_id);
     if(method==='GET' && path.length===2) {
-      const staleBefore=new Date(Date.now()-120000).toISOString();
-      const stale=await db.from('email_outbox').update({state:'unknown',error_code:'stale_sending_requires_reconciliation'}).eq('case_id',path[1]).eq('state','sending').lt('last_attempt_at',staleBefore).select('id');
-      assertDb(stale.error,'Pulihkan status email');
-      for(const row of stale.data||[]) await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:path[1],action:'email_send_state_unknown',metadata:{outbox_id:row.id}});
       const e=await db.from('case_evidence').select('*').eq('case_id',path[1]);assertDb(e.error,'Bukti kasus');
       const reports=[] as unknown[], observations=[] as unknown[];
       for(const item of e.data||[]) {
         if(item.report_id) { const r=await db.from('reports').select('*').eq('id',item.report_id).single();if(r.data) reports.push(r.data); }
         if(item.observation_id) { const o=await db.from('observations').select('*').eq('id',item.observation_id).single();if(o.data) observations.push(o.data); }
       }
-      const outbox=await db.from('email_outbox').select('id,case_revision,recipient_address,sender,subject,body,content_hash,state,provider_message_id,attempts,error_code,created_at').eq('case_id',path[1]).order('created_at',{ascending:false});
       const audit=await db.from('audit_events').select('*').eq('entity_type','case').eq('entity_id',path[1]).order('created_at',{ascending:false});
-      return json({item:c.data,evidence:e.data,reports,observations,outbox:outbox.data||[],audit:audit.data||[]});
+      return json({item:c.data,evidence:e.data,reports,observations,audit:audit.data||[]});
     }
     if(method==='PATCH' && path.length===2) {
-      const x=await body(request,z.object({expectedRevision:z.number().int().positive(),status:z.enum(statuses),priority:z.enum(['routine','priority_review','urgent_review']),publicNote:z.string().max(2000).optional(),privateNote:z.string().max(4000).optional(),reason:z.string().min(3).max(1000)}));
+      const x=await body(request,caseReviewSchema);
       if(c.data.revision!==x.expectedRevision) throw new ApiError(409,'revision_conflict','Kasus telah berubah. Muat ulang.');
       if(['resolved','closed_without_resolution'].includes(x.status) && !x.reason.trim()) throw new ApiError(422,'reason_required','Alasan penutupan diperlukan.');
-      const q=await db.from('cases').update({status:x.status,priority:x.priority,public_note:x.publicNote,private_note:x.privateNote,revision:x.expectedRevision+1,updated_at:new Date().toISOString()}).eq('id',path[1]).eq('revision',x.expectedRevision).select('*');assertDb(q.error,'Perbarui kasus');
+      const q=await db.from('cases').update({status:x.status,priority:x.priority,public_note:x.publicNote??c.data.public_note,private_note:x.privateNote??c.data.private_note,revision:x.expectedRevision+1,updated_at:new Date().toISOString()}).eq('id',path[1]).eq('revision',x.expectedRevision).select('*');assertDb(q.error,'Perbarui kasus');
       if(!q.data?.length) throw new ApiError(409,'revision_conflict','Kasus telah berubah.');
-      await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:path[1],action:'review_update',reason:x.reason,metadata:{from:c.data.status,to:x.status,revision:q.data[0].revision}});
+      const audit=await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:path[1],action:'review_update',reason:x.reason,metadata:{from:c.data.status,to:x.status,priority_from:c.data.priority,priority_to:x.priority,revision:q.data[0].revision}});
+      assertDb(audit.error,'Riwayat penilaian');
       const links=await db.from('case_evidence').select('report_id').eq('case_id',path[1]).not('report_id','is',null);
       assertDb(links.error,'Bukti laporan');
       const reportStatus=x.status==='new'?'submitted':x.status==='resolved'||x.status==='closed_without_resolution'?'closed':'under_review';
       for(const link of links.data||[]) {
         if(!link.report_id) continue;
-        const updated=await db.from('reports').update({status:reportStatus,reviewer_note_public:x.publicNote||null}).eq('id',link.report_id);
+        const updated=await db.from('reports').update({status:reportStatus,...(x.publicNote!==undefined?{reviewer_note_public:x.publicNote||null}:{})}).eq('id',link.report_id);
         assertDb(updated.error,'Tindak lanjut laporan');
       }
       return json({item:q.data[0]});
-    }
-    if(method==='POST' && path[2]==='email-preview') {
-      const x=await body(request,z.object({recipientId:uuid}));
-      if(c.data.status!=='ready_for_referral') throw new ApiError(409,'case_not_ready','Tandai kasus siap dirujuk sebelum membuat email.');
-      const recipient=await db.from('agency_recipients').select('*').eq('id',x.recipientId).eq('enabled',true).single();assertDb(recipient.error,'Penerima');
-      if(!allowedRecipient(recipient.data!.address,!!recipient.data!.verified_at,recipient.data!.is_test)) throw new ApiError(403,'recipient_not_approved','Alamat belum disetujui untuk mode email ini.');
-      const ev=await db.from('case_evidence').select('report_id,observation_id').eq('case_id',path[1]);
-      const lines=[`Kasus Nakhoda: ${c.data.title}`,`ID kasus: ${c.data.id}`,`Kategori: ${c.data.category}`,`Status: ${c.data.status}`,`Prioritas tinjauan: ${c.data.priority}`,''];
-      let hasOptical=false,hasHeat=false,hasField=false,qualityGood=true;
-      for(const item of ev.data||[]) {
-        if(item.report_id) {
-          const r=await db.from('reports').select('id,lon,lat,observed_at,description,category').eq('id',item.report_id).single();
-          if(r.data) { const approx=snap250(r.data.lon,r.data.lat);lines.push(`Laporan ${r.data.id}: ${safeDate(r.data.observed_at)} WIB, sekitar ${approx.lat.toFixed(3)}, ${approx.lon.toFixed(3)}. ${r.data.description}`); }
-          const f=await db.from('field_validations').select('stance').eq('report_id',item.report_id).maybeSingle();hasField ||=!!f.data;
-        }
-        if(item.observation_id) {
-          const o=await db.from('observations').select('id,type,source_name,source_product_id,source_asset_ids,observed_start,observed_end,limitations,quality_flags,state').eq('id',item.observation_id).single();
-          if(o.data) { hasOptical ||=o.data.type==='optical_change';hasHeat ||=o.data.type==='heat_stress';qualityGood &&= o.data.state==='published';lines.push(`Observasi ${o.data.id}: ${o.data.source_name} / ${o.data.source_product_id}, ${safeDate(o.data.observed_start)}–${safeDate(o.data.observed_end)} WIB. ID sumber: ${o.data.source_asset_ids.join(', ')}. Batasan: ${o.data.limitations}`); }
-        }
-      }
-      const rec=recommendation(c.data.category,hasOptical,hasField,hasHeat,qualityGood);
-      lines.push('',`Saran tinjauan (${PLAYBOOK_VERSION}, aturan ${rec.rule}): ${rec.text}`,'',`Catatan peninjau: ${c.data.public_note||'Belum ada.'}`,'','Bukti satelit dan laporan lapangan memerlukan penilaian; perbedaan optik tidak membuktikan kerusakan karang. Balasan/konfirmasi lembaga dicatat terpisah dari penerimaan Gmail.','Email ini berasal dari tim pilot Nakhoda, bukan pernyataan resmi lembaga.');
-      const subject=`${emailMode()==='test'?'[DEMO] ':''}Nakhoda — ${c.data.title} (${c.data.id.slice(0,8)})`;
-      const text=lines.join('\n'),sender=process.env.EMAIL_SENDER||'';
-      if(!sender) throw new ApiError(503,'gmail_unconfigured','Alamat pengirim belum dikonfigurasi.');
-      const hash=contentHash(subject,text,recipient.data!.address);
-      const old=await db.from('email_outbox').select('*').eq('case_id',path[1]).eq('case_revision',c.data.revision).eq('recipient_id',x.recipientId).maybeSingle();
-      if(old.data) {if(old.data.content_hash!==hash) throw new ApiError(409,'preview_conflict','Isi email pada revisi ini telah berubah. Perbarui kasus dahulu.');return json({preview:old.data});}
-      const out=await db.from('email_outbox').insert({case_id:path[1],case_revision:c.data.revision,recipient_id:x.recipientId,sender,recipient_address:recipient.data!.address,subject,body:text,content_hash:hash,state:'draft'}).select('*').single();assertDb(out.error,'Pratinjau email');
-      return json({preview:out.data});
-    }
-    if(method==='POST' && path[2]==='email-send') {
-      const x=await body(request,z.object({outboxId:uuid,contentHash:z.string().length(64)}));
-      const o=await db.from('email_outbox').select('*').eq('id',x.outboxId).eq('case_id',path[1]).single();assertDb(o.error,'Kotak keluar');
-      if(o.data!.state==='provider_accepted') return json({item:o.data,alreadySent:true});
-      if(o.data!.state!=='draft' && o.data!.state!=='failed') throw new ApiError(409,'send_state_conflict','Status email perlu ditinjau sebelum dikirim ulang.');
-      if(o.data!.case_revision!==c.data.revision || o.data!.content_hash!==x.contentHash || c.data.status!=='ready_for_referral') throw new ApiError(409,'preview_stale','Pratinjau tidak cocok dengan revisi kasus saat ini.');
-      const recipient=await db.from('agency_recipients').select('*').eq('id',o.data!.recipient_id).single();assertDb(recipient.error,'Penerima');
-      if(!recipient.data!.enabled || !allowedRecipient(o.data!.recipient_address,!!recipient.data!.verified_at,recipient.data!.is_test)) throw new ApiError(403,'recipient_not_approved','Penerima tidak lagi disetujui.');
-      const count=await db.from('email_outbox').select('id',{count:'exact',head:true}).eq('approved_by',user.id).gte('last_attempt_at',new Date(Date.now()-3600000).toISOString());
-      if((count.count||0)>=5) throw new ApiError(429,'email_rate_limit','Batas lima email per jam tercapai.');
-      const lock=await db.from('email_outbox').update({state:'sending',approved_by:user.id,approved_at:new Date().toISOString(),attempts:o.data!.attempts+1,last_attempt_at:new Date().toISOString(),error_code:null}).eq('id',x.outboxId).eq('state',o.data!.state).select('*');assertDb(lock.error,'Kunci email');
-      if(!lock.data?.length) throw new ApiError(409,'send_in_progress','Email sedang dikirim dari sesi lain.');
-      await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:path[1],action:'email_approved',metadata:{outbox_id:x.outboxId,recipient:o.data!.recipient_address,hash:x.contentHash}});
-      try {
-        const messageId=await sendGmail(o.data!.recipient_address,o.data!.subject,o.data!.body);
-        const saved=await db.from('email_outbox').update({state:'provider_accepted',provider_message_id:messageId}).eq('id',x.outboxId).eq('state','sending').select('*');assertDb(saved.error,'Status Gmail');
-        await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:path[1],action:'gmail_provider_accepted',metadata:{outbox_id:x.outboxId,message_id:messageId}});
-        return json({item:saved.data?.[0],receipt:'Gmail menerima pesan; pengiriman ke kotak masuk belum terverifikasi.'});
-      } catch(error) {
-        const code=error instanceof ApiError?error.code:'gmail_send_unknown';
-        const state=code==='gmail_send_unknown'?'unknown':'failed';
-        await db.from('email_outbox').update({state,error_code:code}).eq('id',x.outboxId).eq('state','sending');
-        throw error;
-      }
-    }
-  }
-  if(path.join('/')==='admin/recipients') {
-    if(user.role!=='admin') throw new ApiError(403,'admin_required','Administrator diperlukan.');
-    if(method==='GET') { const q=await db.from('agency_recipients').select('*').order('created_at',{ascending:false});return json({items:dataOrThrow(q.data,q.error,'Penerima')}); }
-    if(method==='POST') {
-      const x=await body(request,z.object({address:z.email(),isTest:z.boolean(),verificationSource:z.string().max(500).optional()}));
-      if(!x.isTest && !x.verificationSource) throw new ApiError(422,'verification_required','Sumber verifikasi alamat resmi diperlukan.');
-      const q=await db.from('agency_recipients').insert({address:x.address.toLowerCase(),is_test:x.isTest,verification_source:x.verificationSource||'team-controlled test inbox',verified_at:new Date().toISOString(),verified_by:user.id,enabled:true}).select('*').single();assertDb(q.error,'Tambah penerima');return json({item:q.data},201);
     }
   }
   if(path.join('/')==='admin/roles' && method==='POST') {
@@ -402,11 +348,6 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
     else await db.from('area_memberships').delete().eq('user_id',x.userId);
     await db.from('audit_events').insert({actor_id:user.id,entity_type:'profile',entity_id:x.userId,action:'role_assigned',metadata:{role:x.role,area_id:areaId}});
     return json({assigned:true});
-  }
-  if(path.join('/')==='recipients' && method==='GET') {
-    if(user.role==='fisherman') throw new ApiError(403,'role_forbidden','Akses peninjau diperlukan.');
-    const q=await db.from('agency_recipients').select('id,address,is_test,verified_at,enabled').eq('enabled',true);
-    return json({items:(dataOrThrow(q.data,q.error,'Penerima')||[]).filter(x=>allowedRecipient(x.address,!!x.verified_at,x.is_test))});
   }
   throw new ApiError(404,'route_not_found','Rute tidak ditemukan.');
 }

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/client';
 import { OPEN_STATUSES, REPORT_CATEGORIES, REPORT_STATUS, cellLevel, confidence, problemCell, satelliteSignal, type ReviewAction, type SatelliteObservation } from '@/lib/review';
 import { ObservationImages } from './ObservationImages';
+import { IndicationReview } from './IndicationReview';
+import { CASE_STATUS } from '@/lib/case-review';
 
 export type ReviewReport={id:string;category:string;lon:number;lat:number;observed_at:string;submitted_at:string;status:string;description:string;text_only_reason:string|null;location_method:string;accuracy_m:number|null;reviewer_note_public:string|null;revision:number;photoCount?:number};
 export type ProblemCell=ReturnType<typeof problemCell>&{reports:ReviewReport[];open:number;verified:number;satellite:SatelliteObservation[];level:'problem'|'watch'|null};
@@ -12,7 +14,6 @@ export const statusLabel=(s:string)=>REPORT_STATUS[s]||s;
 export type FollowUp={caseId:string;status:string};
 const shortSignal=(label:string)=>label.replace(/^Perubahan optik Sentinel-2: (.*?) berubah.*$/,'Perubahan warna dasar laut · $1').replace(/^Panas karang NOAA: /,'Panas karang · ');
 export type Indication={o:SatelliteObservation;cell:ReturnType<typeof problemCell>;label:string;followUp?:FollowUp};
-const CASE_STATUS:Record<string,string>={new:'Kasus baru',reviewing:'Kasus ditinjau',ready_for_referral:'Siap dirujuk',referred:'Dirujuk',acknowledged:'Diterima instansi',in_progress:'Ditangani',resolved:'Selesai',closed_without_resolution:'Ditutup'};
 const CASE_CLOSED=['resolved','closed_without_resolution'];
 
 /** Groups reports and counted satellite indications into 0.05° cells with a level. */
@@ -115,7 +116,6 @@ export function ReviewReportDetail({id}:{id:string}){
           <button className="secondary" disabled={busy} onClick={()=>act('needs_information')}>Minta foto / info tambahan</button>
           <button className="secondary" disabled={busy||r.status==='unsubstantiated'} onClick={()=>act('unsubstantiated')}>Tidak terbukti</button>
           <button className="danger" disabled={busy||r.status==='closed'} onClick={()=>act('closed')}>Tutup laporan</button>
-          {data.case&&<a className="text-link" href={`/dashboard/cases/${data.case.id}`}>Buka kasus & rujukan ke instansi →</a>}
           {message&&<p className="sheet-note" role="status">{message}</p>}
         </div>
         <div className="panel"><h2>Riwayat</h2><ol className="timeline">{steps.map((s,i)=><li key={i} className={s.tone}><strong>{s.label}</strong>{s.at&&<small>{when(s.at)}</small>}</li>)}</ol></div>
@@ -138,16 +138,15 @@ export function SatelliteEvidence({o}:{o:SatelliteObservation}){
 type FullObservation=SatelliteObservation&{source_name:string;source_product_id:string;source_asset_ids:string[];limitations:string;manifest:Record<string,unknown>};
 /** Detail page for an indication that comes only from satellite data. */
 export function IndicationDetail({id}:{id:string}){
-  const {cells,followUps,error:listError}=useReviewData(),[item,setItem]=useState<FullObservation|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[created,setCreated]=useState<string|null>(null),[message,setMessage]=useState('');
+  const {cells,followUps,error:listError}=useReviewData(),[item,setItem]=useState<FullObservation|null>(null),[error,setError]=useState(''),[saved,setSaved]=useState<FollowUp|null>(null);
   useEffect(()=>{api(`observations/${id}`).then(x=>setItem(x.item)).catch(e=>setError((e as Error).message));},[id]);
   if(error||listError)return <section className="page review-page"><a href="/government/reports">← Laporan masuk</a><AccessError message={error||listError}/></section>;
   if(!item)return <section className="page review-page"><p role="status">Memuat indikasi…</p></section>;
-  const cell=problemCell(item.lon,item.lat),reports=cells.get(cell.key)?.reports||[],s=satelliteSignal(item),caseId=created||followUps[id]?.caseId;
-  async function openCase(){setBusy(true);setMessage('');try{const x=await api(`review/indications/${id}/case`,{method:'POST'});setCreated(x.caseId);setMessage('Kasus dibuat. Status dan rujukan ke instansi diatur di halaman kasus.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
+  const cell=problemCell(item.lon,item.lat),reports=cells.get(cell.key)?.reports||[],s=satelliteSignal(item),assessment=saved||followUps[id];
   return <section className="page review-page">
     <a href="/government/reports">← Laporan masuk</a>
-    <div className="page-heading"><div><h1>Indikasi satelit · Sel {cell.code}</h1><p>{item.type==='optical_change'?'Perubahan warna dasar laut · Sentinel-2':'Tekanan panas karang · NOAA'}</p></div><span className={`status-pill ${s.indication?'status-satellite':''}`}>{s.indication?'Perlu dicek':'Tidak dihitung'}</span></div>
-    <div className="review-detail">
+    <div className="page-heading"><div><h1>Indikasi satelit · Sel {cell.code}</h1><p>{item.type==='optical_change'?'Perubahan warna dasar laut · Sentinel-2':'Tekanan panas karang · NOAA'}</p></div><span className={`status-pill ${assessment?`case-${assessment.status}`:s.indication?'status-satellite':''}`}>{assessment?CASE_STATUS[assessment.status]||assessment.status:s.indication?'Perlu dicek':'Tidak dihitung'}</span></div>
+    <div className="review-detail indication-layout">
       <div className="review-main">
         <IndicationSummary o={item}/>
         {item.type==='optical_change'&&<div className="panel"><h2>Citra yang dibandingkan</h2><ObservationImages manifest={item.manifest}/></div>}
@@ -157,10 +156,7 @@ export function IndicationDetail({id}:{id:string}){
         <details className="panel tech-details"><summary>Detail teknis</summary><TechDetails o={item}/></details>
         <div className="panel"><h2>Laporan nelayan di sel {cell.code}</h2>{reports.length?<ReportCards items={reports} cells={cells}/>:<p>Belum ada laporan nelayan di sel ini. Indikasi satelit saja belum cukup untuk menyimpulkan kondisi; minta pengecekan lapangan atau tunggu laporan nelayan.</p>}</div>
       </div>
-      <aside className="review-side"><div className="panel action-panel"><h2>Tindak lanjut</h2>
-        {caseId?<><p>Indikasi ini sudah punya kasus{followUps[id]?` (${CASE_STATUS[followUps[id].status]||followUps[id].status})`:''}.</p><a className="primary link-button" href={`/dashboard/cases/${caseId}`}>Buka kasus & rujukan</a></>:<><p>Buat kasus bila indikasi ini perlu dicek lapangan atau dirujuk ke instansi.</p><button className="primary" disabled={busy} onClick={openCase}>{busy?'Membuat…':'Buat kasus tindak lanjut'}</button></>}
-        {message&&<p className="sheet-note" role="status">{message}</p>}
-      </div></aside>
+      <aside className="review-side"><IndicationReview key={id} id={id} onSaved={review=>setSaved({caseId:review.id,status:review.status})}/></aside>
     </div>
   </section>;
 }
