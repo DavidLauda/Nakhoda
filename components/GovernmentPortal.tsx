@@ -3,9 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/client';
 import { satelliteSignal } from '@/lib/review';
 import { MapView, type MapAreaProperties, type MapAreas, type MapPin } from './MapView';
-import { AccessError, CATEGORY_COLORS, ReportCards, ReportFilters, SatelliteEvidence, buildCells, categoryLabel, filterIndications, filterReports, useReviewData } from './ReviewReports';
+import { AccessError, ReportCards, ReportFilters, SatelliteEvidence, buildCells, categoryLabel, filterIndications, filterReports, useReviewData } from './ReviewReports';
 
 type Source={id?:string;source_name:string;status:string;latest_check_at:string|null;latest_usable_observation_at:string|null;error_code?:string};
+const SHORT_CATEGORY:Record<string,string>={coral_concern:'Karang',mangrove_damage:'Mangrove',shoreline_erosion:'Abrasi',marine_waste:'Sampah',water_pollution:'Pencemaran',other:'Lainnya'};
 const when=(date?:string|null)=>date?new Intl.DateTimeFormat('id-ID',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(date))+' WIB':'Belum tersedia';
 
 export function GovernmentPortal(){
@@ -17,11 +18,15 @@ export function GovernmentPortal(){
   const mapCells=useMemo(()=>buildCells(filtered,!category||category==='satellite'?observations:[]),[filtered,category,observations]);
   const visibleCells=useMemo(()=>[...mapCells.values()].filter(c=>c.level),[mapCells]);
   const areas:MapAreas=useMemo(()=>({type:'FeatureCollection',features:visibleCells.map(c=>({type:'Feature' as const,geometry:{type:'Polygon' as const,coordinates:[[[c.west,c.south],[c.east,c.south],[c.east,c.north],[c.west,c.north],[c.west,c.south]]]},properties:{id:`problem-${c.key}`,kind:'problem' as const,level:c.level!,name:`Sel ${c.code}`}}))}),[visibleCells]);
+  const extent=useMemo<[number,number,number,number]|null>(()=>visibleCells.length?[Math.min(...visibleCells.map(c=>c.west)),Math.min(...visibleCells.map(c=>c.south)),Math.max(...visibleCells.map(c=>c.east)),Math.max(...visibleCells.map(c=>c.north))]:null,[visibleCells]);
   const pins:MapPin[]=useMemo(()=>visibleCells.flatMap(c=>{
     const counts=new Map<string,number>();for(const r of c.reports)counts.set(r.category,(counts.get(r.category)||0)+1);
-    const kinds=[...counts.entries()];const step=(c.east-c.west)/(kinds.length+1);
-    // One marker per problem type, spread across the cell so several types stay readable.
-    return kinds.map(([cat,n],i)=>({id:`count-${c.key}-${cat}`,lon:c.west+step*(i+1),lat:(c.south+c.north)/2,kind:'report' as const,label:`Sel ${c.code}: ${n} laporan ${categoryLabel(cat).toLowerCase()}`,count:n,color:CATEGORY_COLORS[cat]}));
+    // Text labels name the problem type, so the map needs no colour legend beyond severity.
+    const labels:[string,string][]=[...counts.entries()].map(([cat,n])=>[cat,`${SHORT_CATEGORY[cat]||categoryLabel(cat)} ${n}`]);
+    if(c.satellite.length)labels.push(['satellite','Satelit']);
+    // Alternate top/bottom by column so labels of neighbouring cells don't collide.
+    const step=(c.north-c.south)*0.22;
+    return labels.map(([cat,text],i)=>({id:`count-${c.key}-${cat}`,lon:(c.west+c.east)/2,lat:Number(c.key.split(',')[0])%2?c.north-step*(i+1):c.south+step*(labels.length-i),kind:'report' as const,label:`Sel ${c.code}: ${cat==='satellite'?'indikasi satelit':`${counts.get(cat)} laporan ${categoryLabel(cat).toLowerCase()}`}`,text}));
   }),[visibleCells]);
   const selectCell=useCallback((p:MapAreaProperties)=>{if(p.kind==='problem')setCellKey(p.id.replace('problem-',''));},[]);
   const selectPin=useCallback((p:MapPin)=>setCellKey(p.id.replace('count-','').split('-')[0]),[]);
@@ -40,9 +45,8 @@ export function GovernmentPortal(){
     <div className="stats-row govt-stats">{stats.map(s=><div key={s.label}><strong>{s.value}</strong><span>{s.label}</span><small>{s.note}</small></div>)}</div>
     <div className="problem-layout">
       <div className="panel problem-map-panel">
-        <div className="panel-head"><h2>Kondisi per sel</h2><div className="map-legend inline"><span><i className="legend-area core-area"/>Bermasalah</span><span><i className="legend-area use-area"/>Perlu dicek</span></div></div>
-        <div className="map-legend inline category-legend" aria-label="Jenis masalah">{Object.entries(CATEGORY_COLORS).map(([cat,color])=><span key={cat}><i className="legend-dot" style={{background:color}}/>{categoryLabel(cat)}</span>)}<span><small>angka = jumlah laporan</small></span></div>
-        <div className="map-frame govt-map"><MapView pins={pins} areas={areas} onSelect={selectPin} onAreaSelect={selectCell} selectedId={cellKey?`problem-${cellKey}`:undefined}/></div>
+        <div className="panel-head"><h2>Kondisi per sel</h2><div className="map-legend inline"><span><i className="legend-area core-area"/>Bermasalah</span><span><i className="legend-area use-area"/>Perlu dicek</span><span><b className="legend-label">Sampah 2</b>jenis &amp; jumlah laporan</span></div></div>
+        <div className="map-frame govt-map"><MapView pins={pins} areas={areas} onSelect={selectPin} onAreaSelect={selectCell} selectedId={cellKey?`problem-${cellKey}`:undefined} bounds={extent}/></div>
         <p className="limitation">Sel 0,05° (±5,5 km). <strong>Bermasalah</strong>: ada laporan terverifikasi, ≥2 laporan terbuka, atau laporan yang didukung indikasi satelit. <strong>Perlu dicek</strong>: satu laporan, atau indikasi satelit saja. Kotak tanpa warna berarti belum ada laporan atau indikasi, bukan berarti kondisinya baik.</p>
       </div>
       <div className="panel">

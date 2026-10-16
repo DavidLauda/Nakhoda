@@ -10,6 +10,7 @@ const when=(date?:string|null)=>date?new Intl.DateTimeFormat('id-ID',{day:'numer
 export const categoryLabel=(c:string)=>REPORT_CATEGORIES[c]||c;
 export const statusLabel=(s:string)=>REPORT_STATUS[s]||s;
 export type FollowUp={caseId:string;status:string};
+const shortSignal=(label:string)=>label.replace(/^Perubahan optik Sentinel-2: (.*?) berubah.*$/,'Perubahan warna dasar laut · $1').replace(/^Panas karang NOAA: /,'Panas karang · ');
 export type Indication={o:SatelliteObservation;cell:ReturnType<typeof problemCell>;label:string;followUp?:FollowUp};
 const CASE_STATUS:Record<string,string>={new:'Kasus baru',reviewing:'Kasus ditinjau',ready_for_referral:'Siap dirujuk',referred:'Dirujuk',acknowledged:'Diterima instansi',in_progress:'Ditangani',resolved:'Selesai',closed_without_resolution:'Ditutup'};
 const CASE_CLOSED=['resolved','closed_without_resolution'];
@@ -23,7 +24,6 @@ export function buildCells(items:ReviewReport[],observations:SatelliteObservatio
   for(const c of map.values())c.level=cellLevel({open:c.open,verified:c.verified,satellite:c.satellite.length>0});
   return map;
 }
-export const CATEGORY_COLORS:Record<string,string>={coral_concern:'#d9644a',mangrove_damage:'#2f7d4f',shoreline_erosion:'#9a6a2f',marine_waste:'#3b6fb6',water_pollution:'#7b5ea7',other:'#6b7280'};
 export function useReviewData(){
   const [items,setItems]=useState<ReviewReport[]>([]),[observations,setObservations]=useState<SatelliteObservation[]>([]),[followUps,setFollowUps]=useState<Record<string,FollowUp>>({}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
   useEffect(()=>{api('review/reports').then(x=>{setItems(x.items||[]);setObservations(x.observations||[]);setFollowUps(x.followUps||{});setError('');}).catch(e=>setError((e as Error).message)).finally(()=>setLoading(false));},[]);
@@ -48,8 +48,8 @@ export function filterReports(items:ReviewReport[],category:string,status:string
 export function ReportCards({items,cells,indications=[]}:{items:ReviewReport[];cells:Map<string,ProblemCell>;indications?:Indication[]}){
   if(!items.length&&!indications.length)return <div className="empty">Belum ada laporan yang cocok. Laporan dari menu <strong>Lapor</strong> di aplikasi nelayan akan muncul di sini.</div>;
   return <div className="review-cards">{indications.map(x=><a key={x.o.id} className="review-card satellite" href={`/government/indications/${x.o.id}`}>
-    <div><strong>Indikasi satelit · {x.cell.code}</strong><small>{x.label} · {when(x.o.observed_end)}</small></div>
-    <span className={`status-pill ${x.followUp?`case-${x.followUp.status}`:'status-satellite'}`}>{x.followUp?CASE_STATUS[x.followUp.status]||x.followUp.status:'Belum ditindaklanjuti'}</span></a>)}{items.map(r=>{const c=cells.get(problemCell(r.lon,r.lat).key);const others=(c?.reports.length||1)-1;return <a key={r.id} className={`review-card${r.status==='submitted'?' fresh':''}`} href={`/government/reports/${r.id}`}>
+    <div><strong>Indikasi satelit · {x.cell.code}</strong><small>{shortSignal(x.label)} · {when(x.o.observed_end)}</small></div>
+    <span className={`status-pill ${x.followUp?`case-${x.followUp.status}`:'status-satellite'}`}>{x.followUp?CASE_STATUS[x.followUp.status]||x.followUp.status:'Baru'}</span></a>)}{items.map(r=>{const c=cells.get(problemCell(r.lon,r.lat).key);const others=(c?.reports.length||1)-1;return <a key={r.id} className={`review-card${r.status==='submitted'?' fresh':''}`} href={`/government/reports/${r.id}`}>
     <div><strong>{categoryLabel(r.category)} · {c?.code}</strong><small>{others?`${others+1} laporan di sel ini`:'1 laporan di sel ini'} · {when(r.submitted_at)}{c?.satellite.length?' · ada indikasi satelit':''}</small></div>
     <span className={`status-pill status-${r.status}`}>{statusLabel(r.status)}</span></a>;})}</div>;
 }
@@ -124,21 +124,14 @@ export function ReviewReportDetail({id}:{id:string}){
   </section>;
 }
 
-const FLAG_TEXT:Record<string,string>={habitat_mask_unavailable:'belum ada peta habitat terumbu',tide_depth_turbidity_unresolved:'pasang surut, kedalaman, dan kekeruhan belum dikoreksi',low_valid_overlap:'area citra yang bisa dibandingkan sedikit'};
 /** What a satellite indication is made of, so an officer can judge it before acting. */
 export function SatelliteEvidence({o}:{o:SatelliteObservation}){
-  const s=satelliteSignal(o),m=(o.metrics||{}) as Record<string,unknown>,flags=Array.isArray(o.quality_flags)?o.quality_flags as string[]:[];
-  const optical=o.type==='optical_change';
+  const s=satelliteSignal(o),optical=o.type==='optical_change';
   return <div className="evidence-card">
-    <strong>{optical?'Perubahan warna dasar laut (Sentinel-2)':'Tekanan panas karang (NOAA)'}</strong>
-    <span>{s.label}</span>
-    <dl>
-      <dt>{optical?'Citra dibandingkan':'Periode'}</dt><dd>{o.observed_start?`${when(o.observed_start)} → `:''}{when(o.observed_end)}</dd>
-      {optical&&<><dt>Awan</dt><dd>{Math.round(Number(m.baseline_cloud_percent)||0)}% sebelum · {Math.round(Number(m.current_cloud_percent)||0)}% sesudah</dd><dt>Area terbanding</dt><dd>{o.coverage_fraction!=null?`${Math.round(o.coverage_fraction*100)}%`:'—'}</dd></>}
-      {flags.length>0&&<><dt>Keterbatasan</dt><dd>{flags.map(f=>FLAG_TEXT[f]||f).join('; ')}</dd></>}
-    </dl>
-    <small>{optical?'Artinya: warna piksel berubah di antara dua tanggal. Bisa karena karang, tetapi juga awan tipis, pasang surut, kekeruhan, atau kapal. Bukan bukti kerusakan.':'Artinya: suhu laut di atas normal cukup lama untuk memicu pemutihan. Bukan bukti karang sudah memutih.'}</small>
-    <a href={`/observations/${o.id}`}>{optical?'Lihat citra sebelum/sesudah →':'Lihat detail observasi →'}</a>
+    <strong>{optical?'Perubahan warna dasar laut':'Tekanan panas karang'}</strong>
+    <span>{shortSignal(s.label)} · {when(o.observed_end)}</span>
+    <small>Indikasi dari satelit, belum bukti kerusakan.</small>
+    <a href={`/government/indications/${o.id}`}>Lihat citra dan penjelasan →</a>
   </div>;
 }
 
@@ -153,11 +146,15 @@ export function IndicationDetail({id}:{id:string}){
   async function openCase(){setBusy(true);setMessage('');try{const x=await api(`review/indications/${id}/case`,{method:'POST'});setCreated(x.caseId);setMessage('Kasus dibuat. Status dan rujukan ke instansi diatur di halaman kasus.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
   return <section className="page review-page">
     <a href="/government/reports">← Laporan masuk</a>
-    <div className="page-heading"><div><h1>Indikasi satelit · Sel {cell.code}</h1><p>{item.source_name} · {item.observed_start?`${when(item.observed_start)} → `:''}{when(item.observed_end)}</p></div><span className={`status-pill ${s.indication?'status-satellite':''}`}>{s.indication?'Dihitung sebagai indikasi':'Tidak dihitung'}</span></div>
+    <div className="page-heading"><div><h1>Indikasi satelit · Sel {cell.code}</h1><p>{item.type==='optical_change'?'Perubahan warna dasar laut · Sentinel-2':'Tekanan panas karang · NOAA'}</p></div><span className={`status-pill ${s.indication?'status-satellite':''}`}>{s.indication?'Perlu dicek':'Tidak dihitung'}</span></div>
     <div className="review-detail">
       <div className="review-main">
+        <IndicationSummary o={item}/>
         {item.type==='optical_change'&&<div className="panel"><h2>Citra yang dibandingkan</h2><ObservationImages manifest={item.manifest}/></div>}
-        <div className="panel"><h2>Isi indikasi</h2><SatelliteEvidence o={item}/><p className="limitation">Catatan sumber: {item.limitations}</p></div>
+        <div className="panel plain-text"><h2>Apa artinya?</h2>
+          {item.type==='optical_change'?<><p>Warna sebagian area di kotak ini berubah di antara dua tanggal. Ini <strong>belum bukti kerusakan</strong>; perubahan warna lebih sering disebabkan oleh:</p><ul><li>pantulan matahari atau buih di permukaan air,</li><li>pasang surut yang membuat rataan terumbu lebih atau kurang terendam,</li><li>air yang lebih keruh atau lebih jernih,</li><li>sisa awan tipis atau bayangannya.</li></ul><p>Bandingkan citra sebelum dan sesudah. Bila perubahan hanya ada di permukaan air atau di seluruh kotak, kemungkinan besar bukan perubahan dasar laut.</p></>:<p>Suhu laut di sekitar kotak ini di atas normal. Ini tanda risiko pemutihan karang di wilayah sekitar 5 km, <strong>belum bukti</strong> karang sudah memutih.</p>}
+        </div>
+        <details className="panel tech-details"><summary>Detail teknis</summary><TechDetails o={item}/></details>
         <div className="panel"><h2>Laporan nelayan di sel {cell.code}</h2>{reports.length?<ReportCards items={reports} cells={cells}/>:<p>Belum ada laporan nelayan di sel ini. Indikasi satelit saja belum cukup untuk menyimpulkan kondisi; minta pengecekan lapangan atau tunggu laporan nelayan.</p>}</div>
       </div>
       <aside className="review-side"><div className="panel action-panel"><h2>Tindak lanjut</h2>
@@ -166,4 +163,30 @@ export function IndicationDetail({id}:{id:string}){
       </div></aside>
     </div>
   </section>;
+}
+
+const pct=(v:unknown)=>`${(Number(v)*100).toLocaleString('id-ID',{maximumFractionDigits:1})}%`;
+/** The three numbers an officer needs first, as large tiles. */
+function IndicationSummary({o}:{o:FullObservation}){
+  const m=(o.metrics||{}) as Record<string,unknown>,optical=o.type==='optical_change';
+  const pixels=Number(m.candidate_pixel_count)||0,size=Number(m.pixel_size_m)||10;
+  const cloud=m.square_cloud_fraction_before!=null?`${pct(Math.max(Number(m.square_cloud_fraction_before),Number(m.square_cloud_fraction_after)))}`:`${Math.round(Math.max(Number(m.current_cloud_percent)||0,Number(m.baseline_cloud_percent)||0))}% (citra)`;
+  const alert=Number((m.alert_7day as {value?:unknown}|undefined)?.value);
+  const tiles=optical?[[`${(pixels*size*size/1e4).toLocaleString('id-ID',{maximumFractionDigits:1})} ha`,'area yang warnanya berubah'],[cloud,'awan di kotak studi'],[`${o.observed_start?new Intl.DateTimeFormat('id-ID',{day:'numeric',month:'short'}).format(new Date(o.observed_start))+'–':''}${new Intl.DateTimeFormat('id-ID',{day:'numeric',month:'short'}).format(new Date(o.observed_end))}`,'tanggal citra dibandingkan']]
+    :[[['Tidak ada','Watch','Warning','Alert 1','Alert 2','Alert 3','Alert 4','Alert 5'][alert]||'—','status peringatan NOAA'],[`${String((m.dhw as {value?:unknown}|undefined)?.value??'—')}`,'DHW (°C-minggu)'],[when(o.observed_end),'data terakhir']];
+  return <div className="summary-tiles">{tiles.map(([v,l])=><div key={l}><strong>{v}</strong><span>{l}</span></div>)}</div>;
+}
+const FLAG_PLAIN:Record<string,string>={habitat_mask_unavailable:'Belum ada peta habitat terumbu untuk kotak ini',tide_depth_turbidity_unresolved:'Pasang surut, kedalaman, dan kekeruhan belum dikoreksi',low_valid_overlap:'Area yang bisa dibandingkan sedikit',cloud_in_study_area:'Ada awan di kotak studi'};
+function TechDetails({o}:{o:FullObservation}){
+  const m=(o.metrics||{}) as Record<string,unknown>,flags=Array.isArray(o.quality_flags)?o.quality_flags as string[]:[];
+  return <dl className="tech-list">
+    <dt>Sumber</dt><dd>{o.source_name} · {o.source_product_id}</dd>
+    {o.type==='optical_change'&&<><dt>Awan seluruh citra</dt><dd>{Math.round(Number(m.baseline_cloud_percent)||0)}% sebelum, {Math.round(Number(m.current_cloud_percent)||0)}% sesudah</dd>
+    {m.square_cloud_fraction_before!=null&&<><dt>Awan di kotak</dt><dd>{pct(m.square_cloud_fraction_before)} sebelum, {pct(m.square_cloud_fraction_after)} sesudah; tepi awan sudah disaring</dd></>}
+    <dt>Area terbanding</dt><dd>{o.coverage_fraction!=null?`${Math.round(o.coverage_fraction*100)}% dari kotak`:'—'}</dd>
+    <dt>Piksel berubah</dt><dd>{String(m.candidate_pixel_count??0)} piksel {String(m.pixel_size_m??10)} m</dd></>}
+    <dt>Keterbatasan</dt><dd><ul>{flags.map(f=><li key={f}>{FLAG_PLAIN[f]||f}</li>)}</ul></dd>
+    <dt>ID citra</dt><dd className="mono">{o.source_asset_ids.join(', ')}</dd>
+    <dt>Catatan pipeline</dt><dd>{o.limitations}</dd>
+  </dl>;
 }

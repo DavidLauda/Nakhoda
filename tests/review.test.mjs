@@ -16,6 +16,9 @@ test('satellite indications need a NOAA warning or optical candidates',()=>{
   assert.equal(satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:12,current_cloud_percent:3,baseline_cloud_percent:5}}).indication,true);
   const cloudy=satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:1150,pixel_size_m:10,current_cloud_percent:20.82,baseline_cloud_percent:20.68}});
   assert.equal(cloudy.indication,false);assert.match(cloudy.ignored,/awan 21%/);assert.match(cloudy.label,/11,5 ha/);
+  const v2clear=satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:1905,current_cloud_percent:20.8,baseline_cloud_percent:20.7,square_cloud_fraction_before:0.018,square_cloud_fraction_after:0}});
+  assert.equal(v2clear.indication,true);assert.match(v2clear.label,/awan di kotak 1,8%/);
+  assert.equal(satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:50,square_cloud_fraction_before:0.2,square_cloud_fraction_after:0}}).indication,false);
   assert.equal(satelliteSignal({type:'heat_stress',metrics:null}).indication,false);
 });
 test('cell level combines reports and satellite',()=>{

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { ExpressionSpecification, GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
 
-export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string;count?:number;color?:string};
+export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string;count?:number;color?:string;text?:string};
 export type MapAreaProperties={id:string;kind:'conservation'|'environment'|'problem';level?:'problem'|'watch';name:string;category?:'high'|'moderate'|'caution'|'avoid'|'unknown';zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
 export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
@@ -16,7 +16,7 @@ const styleReady=(m:MlMap|null):m is MlMap=>!!m&&!!m.style&&m.isStyleLoaded()===
 const selectedFilter=(id?:string)=>['==',['get','id'],id??''] as ['==',['get',string],string];
 function applySelected(m:MlMap|null,id?:string){if(styleReady(m)&&m.getLayer('environment-selected'))m.setFilter('environment-selected',selectedFilter(id));}
 
-export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,userLocation,selectedId,focus}:{pins:MapPin[];areas?:MapAreas;onPick?:(lon:number,lat:number)=>void;onSelect?:(pin:MapPin)=>void;onAreaSelect?:(area:MapAreaProperties)=>void;userLocation?:{lon:number;lat:number;accuracy:number}|null;selectedId?:string;focus?:{lon:number;lat:number}|null}) {
+export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,userLocation,selectedId,focus,bounds}:{pins:MapPin[];areas?:MapAreas;onPick?:(lon:number,lat:number)=>void;onSelect?:(pin:MapPin)=>void;onAreaSelect?:(area:MapAreaProperties)=>void;userLocation?:{lon:number;lat:number;accuracy:number}|null;selectedId?:string;focus?:{lon:number;lat:number}|null;bounds?:[number,number,number,number]|null}) {
   const element=useRef<HTMLDivElement>(null), map=useRef<MlMap|null>(null), markers=useRef<Marker[]>([]),locationMarker=useRef<Marker|null>(null),selectedRef=useRef(selectedId),appliedAreas=useRef<MapAreas|null>(null),[mapReady,setMapReady]=useState(false);
   const style=process.env.NEXT_PUBLIC_MAP_STYLE_URL || defaultStyle;
   useEffect(()=>{if(!element.current)return;let disposed=false;
@@ -25,7 +25,7 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
   // Callbacks change without rebuilding map.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[style]);
-  useEffect(()=>{if(!map.current)return;markers.current.forEach(x=>x.remove());markers.current=[];import('maplibre-gl').then(({default:maplibre})=>{if(!map.current)return;for(const pin of pins){const el=document.createElement('button');el.type='button';el.className=`map-pin ${pin.kind}${pin.count?' with-count':''}`;if(pin.count)el.textContent=String(pin.count);if(pin.color)el.style.background=pin.color;el.title=pin.label;el.setAttribute('aria-label',pin.label);el.onclick=e=>{e.stopPropagation();onSelect?.(pin);};markers.current.push(new maplibre.Marker({element:el}).setLngLat([pin.lon,pin.lat]).addTo(map.current));}});return()=>{markers.current.forEach(x=>x.remove());markers.current=[];};},[pins,onSelect,mapReady]);
+  useEffect(()=>{if(!map.current)return;markers.current.forEach(x=>x.remove());markers.current=[];import('maplibre-gl').then(({default:maplibre})=>{if(!map.current)return;for(const pin of pins){const el=document.createElement('button');el.type='button';el.className=`map-pin ${pin.kind}${pin.text?' with-text':pin.count?' with-count':''}`;if(pin.text)el.textContent=pin.text;else if(pin.count)el.textContent=String(pin.count);if(pin.color)el.style.background=pin.color;el.title=pin.label;el.setAttribute('aria-label',pin.label);el.onclick=e=>{e.stopPropagation();onSelect?.(pin);};markers.current.push(new maplibre.Marker({element:el}).setLngLat([pin.lon,pin.lat]).addTo(map.current));}});return()=>{markers.current.forEach(x=>x.remove());markers.current=[];};},[pins,onSelect,mapReady]);
   useEffect(()=>{const m=map.current;if(!m)return;
     const install=()=>{
       if(!styleReady(m))return;
@@ -51,6 +51,11 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
     return()=>{m.off('styledata',install);m.off('idle',install);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);m.off('click','problem-fill',selectConservation);};
   },[areas,onAreaSelect,mapReady]);
   useEffect(()=>{selectedRef.current=selectedId;applySelected(map.current,selectedId);},[selectedId,mapReady]);
+  const boundsKey=bounds?.join(',');
+  // Fit once per distinct extent (e.g. the officer map zooming to cells that need attention).
+  useEffect(()=>{if(bounds&&map.current)map.current.fitBounds(bounds,{padding:40,maxZoom:11.5,duration:0});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[boundsKey,mapReady]);
   useEffect(()=>{if(focus&&map.current)map.current.easeTo({center:[focus.lon,focus.lat],zoom:Math.max(map.current.getZoom(),10)});},[focus,mapReady]);
   useEffect(()=>{if(!map.current)return;if(!userLocation){locationMarker.current?.remove();locationMarker.current=null;return;}let disposed=false;import('maplibre-gl').then(({default:maplibre})=>{if(disposed||!map.current)return;if(!locationMarker.current){const el=document.createElement('div');el.className='my-location-pin';el.setAttribute('aria-label','Lokasi GPS saya');locationMarker.current=new maplibre.Marker({element:el}).setLngLat([userLocation.lon,userLocation.lat]).addTo(map.current);}else locationMarker.current.setLngLat([userLocation.lon,userLocation.lat]);map.current.easeTo({center:[userLocation.lon,userLocation.lat],zoom:Math.max(map.current.getZoom(),12)});});return()=>{disposed=true;};},[userLocation,mapReady]);
   return <div ref={element} className="map-canvas" aria-label="Peta pilot Teluk Jakarta dan Kepulauan Seribu"/>;

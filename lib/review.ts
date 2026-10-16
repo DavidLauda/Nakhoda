@@ -29,12 +29,21 @@ export function satelliteSignal(o:SatelliteObservation):{indication:boolean;labe
   const cloud=Math.max(Number(m.current_cloud_percent)||0,Number(m.baseline_cloud_percent)||0);
   if(!Number.isFinite(pixels)||pixels<=0)return {indication:false,label:'Perubahan optik Sentinel-2: tidak ada kandidat'};
   const area=`${(pixels*size*size/1e4).toLocaleString('id-ID',{maximumFractionDigits:1})} ha`;
-  // Thin cloud and its edges survive the SCL mask and read as "change"; such pairs are shown but not counted.
+  // optical-change-v0.2 measures cloud inside the study square and buffers cloud edges; trust that over scene cloud.
+  const square=[m.square_cloud_fraction_before,m.square_cloud_fraction_after].map(Number).filter(Number.isFinite);
+  if(square.length){
+    const inSquare=Math.max(...square)*100;
+    if(inSquare>OPTICAL_MAX_SQUARE_CLOUD)return {indication:false,ignored:`awan ${Math.round(inSquare)}% di dalam kotak studi`,label:`Perubahan optik Sentinel-2: ${area} berubah, tidak dihitung karena awan di kotak ${Math.round(inSquare)}%`};
+    return {indication:true,label:`Perubahan optik Sentinel-2: ${area} berubah (${pixels} piksel, awan di kotak ${inSquare.toLocaleString('id-ID',{maximumFractionDigits:1})}%)`};
+  }
+  // Older pairs only know scene cloud; thin cloud and its edges survive the SCL mask and read as "change".
   if(cloud>=OPTICAL_MAX_CLOUD)return {indication:false,ignored:`awan ${Math.round(cloud)}% pada salah satu citra`,label:`Perubahan optik Sentinel-2: ${area} berubah, tidak dihitung karena awan ${Math.round(cloud)}%`};
   return {indication:true,label:`Perubahan optik Sentinel-2: ${area} berubah (${pixels} piksel)`};
 }
 /** Optical pairs with this much scene cloud are too likely to flag cloud edges as change. */
 export const OPTICAL_MAX_CLOUD=15;
+/** Same gate the pipeline applies (max_square_cloud_fraction 0.05), expressed in percent. */
+export const OPTICAL_MAX_SQUARE_CLOUD=5;
 
 /** Problem = a verified report, two open reports, or a report backed by a satellite indication. Watch = one open report or a satellite indication alone. */
 export function cellLevel({open,verified,satellite}:{open:number;verified:number;satellite:boolean}):'problem'|'watch'|null{
