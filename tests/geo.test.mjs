@@ -56,6 +56,7 @@ test('one square per location gives conservation priority over a measured score'
   assert.deepEqual([...blocked],['blocked']);
   assert.equal(areas.features.length,2);
   assert.equal(areas.features.find(f=>f.properties.kind==='conservation').properties.zoneType,'Inti');
+  assert.equal(areas.features.find(f=>f.properties.kind==='conservation').properties.category,'avoid');
   assert.equal(areas.features.find(f=>f.properties.kind==='environment').properties.id,'free');
   assert.deepEqual(recommended.map(c=>c.id),['free']);
 });
@@ -70,7 +71,11 @@ test('full sea grid fills gaps with fresh coarse data or unknown, keeping land a
   const {areas,recommended}=buildFisherGrid(cells,grid,sea,now);
   assert.deepEqual(areas.features.map(f=>f.properties.coverage),['measured','estimate','unknown']);
   assert.equal(areas.features[1].properties.sourceCellId,'coarse');
-  assert.equal(areas.features[1].properties.score,undefined);
+  assert.equal(areas.features[1].properties.score,99);
+  assert.equal(areas.features[1].properties.category,'high');
+  assert.equal(areas.features[1].properties.coverage,'estimate');
+  assert.equal(areas.features[2].properties.category,'unknown');
+  assert.equal(areas.features[2].properties.score,undefined);
   assert.deepEqual(recommended.map(c=>c.id),['direct']);
   assert.equal(areas.features.length,3);
   for(const observed_end of ['2026-10-01','2026-10-18','invalid']){
@@ -87,6 +92,23 @@ test('coastal geometry is retained and a measured centre on land is not recommen
   assert.deepEqual(result.areas.features[0].geometry,clipped);
   assert.equal(result.areas.features[0].properties.coverage,'unknown');
   assert.equal(result.recommended.length,0);
+});
+
+test('estimated and measured scores share green categories; conservation overrides either',()=>{
+  const grid={origin:[0,0],resolutions:{'0.01':[[2,0,'Inti','Core',1],[3,0,'Perlindungan Bahari','Protection',2],[4,0,'Pemanfaatan Terbatas','Limited use',3],[5,0,'Pemanfaatan','Use',4]]}};
+  const sea={origin:[0,0],step:.01,cells:[[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[10,0]]};
+  const base={resolution:'0.01 degree',currentScore:59,exclusion:null,observed_end:'2026-10-16',sst_c:30,chlorophyll_mg_m3:1};
+  const cells=[{...base,id:'direct',lon:.005,lat:.005},
+    {...base,id:'coarse-high',lon:.025,lat:.025,resolution:'0.05 degree',currentScore:60},
+    {...base,id:'coarse-medium',lon:.075,lat:.025,resolution:'0.05 degree',currentScore:59},
+    {...base,id:'blocked',lon:.025,lat:.005,currentScore:100}];
+  const {areas,recommended}=buildFisherGrid(cells,grid,sea,Date.parse('2026-10-16T06:00:00Z'));
+  assert.deepEqual(areas.features.map(f=>f.properties.category),['moderate','high','avoid','avoid','caution','caution','moderate','unknown']);
+  assert.equal(areas.features[0].properties.score,59);
+  assert.equal(areas.features[1].properties.score,60);
+  assert.equal(areas.features[6].properties.score,59);
+  assert.deepEqual(recommended.map(c=>c.id),['direct']);
+  assert.ok(areas.features.filter(f=>f.properties.kind==='conservation').every(f=>f.properties.score===undefined));
 });
 test('distance and compass direction',()=>{
   const muaraAngke={lon:106.775,lat:-6.106},pari={lon:106.62,lat:-5.86};

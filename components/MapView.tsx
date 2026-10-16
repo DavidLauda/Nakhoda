@@ -1,13 +1,16 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
-import type { GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
 
 export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string};
-export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
+export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;category?:'high'|'moderate'|'caution'|'avoid'|'unknown';zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
 export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
 const emptyAreas:MapAreas={type:'FeatureCollection',features:[]};
+const areaFillColor:ExpressionSpecification=['match',['get','category'],'high','#14876b','moderate','#8fd0b4','avoid','#c8553d','unknown','#cbd5e1','#f0c24b'];
+const areaOutlineColor:ExpressionSpecification=['match',['get','category'],'high','#0e5c3b','moderate','#0e5c3b','avoid','#7a2a18','unknown','#94a3b8','#8a6b16'];
+const areaOutlineWidth:ExpressionSpecification=['interpolate',['linear'],['zoom'],6,0,8,0.15,10,0.5,12,1];
 // MapLibre sets `style` to null after a WebGL context loss (common in Safari) and restores it later.
 const styleReady=(m:MlMap|null):m is MlMap=>!!m&&!!m.style&&m.isStyleLoaded()===true;
 const selectedFilter=(id?:string)=>['==',['get','id'],id??''] as ['==',['get',string],string];
@@ -29,11 +32,11 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
       const source=m.getSource('area-overlays') as GeoJSONSource|undefined;
       if(!source)m.addSource('area-overlays',{type:'geojson',data:areas});else if(appliedAreas.current!==areas)source.setData(areas);
       appliedAreas.current=areas;
-      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','coverage'],'unknown'],'#cbd5e1',['==',['get','coverage'],'estimate'],'#66a9cf',['==',['get','priority'],true],'#14876b','#8fd0b4'],'fill-opacity':0.6}});
-      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':['match',['get','coverage'],'unknown','#94a3b8','estimate','#397b9c','#0e5c3b'],'line-width':1,'line-opacity':0.7}});
-      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#c8553d','Perlindungan Bahari','#8a5a9e','Pemanfaatan','#f0c24b','Pemanfaatan Terbatas','#f0c24b','#c8553d'],'fill-opacity':0.65}});
+      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':areaFillColor,'fill-opacity':0.65}});
+      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.7}});
+      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':areaFillColor,'fill-opacity':0.65}});
       if(!m.getLayer('environment-selected'))m.addLayer({id:'environment-selected',type:'line',source:'area-overlays',filter:selectedFilter(selectedRef.current),paint:{'line-color':'#0b2a3c','line-width':3.5}});
-      if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':'#0b2a3c','line-width':2,'line-opacity':0.9}});
+      if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.7}});
       applySelected(m,selectedRef.current);
     };
     // Re-runs when a style (re)loads or the map settles, including after context restoration; install is idempotent.

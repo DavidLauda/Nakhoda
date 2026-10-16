@@ -5,6 +5,9 @@ export type ConservationGridCell=[number,number,'Inti'|'Perlindungan Bahari'|'Pe
 export type ConservationGrid={origin:[number,number];resolutions:Record<string,ConservationGridCell[]>};
 export type SeaGrid={origin:[number,number];step:number;cells:Array<[number,number,AreaGeometry?]>;source?:string};
 export type DisplayCell={id:string;lon:number;lat:number;resolution:string;currentScore:number|null;exclusion:string|null;observed_start?:string;observed_end:string;sst_c:number|null;chlorophyll_mg_m3:number|null};
+export const HIGH_SCORE_MINIMUM=60;
+export const fisherZoneCategory=(zoneType?:string)=>zoneType==='Pemanfaatan'||zoneType==='Pemanfaatan Terbatas'?'caution' as const:'avoid' as const;
+const scoreCategory=(score:number)=>score>=HIGH_SCORE_MINIMUM?'high' as const:'moderate' as const;
 
 const square=(west:number,south:number,step:number)=>({type:'Polygon' as const,coordinates:[[[west,south],[west+step,south],[west+step,south+step],[west,south+step],[west,south]]]});
 export const gridKey=(lon:number,lat:number,step:number,[west,south]:[number,number])=>`${Math.round((lon-west)/step-0.5)},${Math.round((lat-south)/step-0.5)}`;
@@ -37,7 +40,7 @@ export function buildFisherGrid<T extends DisplayCell>(cells:T[],grid:Conservati
     const geometry=water.get(key);
     return !geometry||pointInArea(cell.lon,cell.lat,geometry);
   }).map(([,cell])=>cell).sort((a,b)=>(b.currentScore??0)-(a.currentScore??0));
-  const priorityIds=new Set(recommended.slice(0,Math.max(1,Math.ceil(recommended.length*.4))).map(c=>c.id));
+  const priorityIds=new Set(recommended.filter(c=>c.currentScore!>=HIGH_SCORE_MINIMUM).map(c=>c.id));
   const features:MapAreas['features']=[];
   for(const [x,y,clipped] of sea.cells){
     const key=`${x},${y}`,lon=sea.origin[0]+(x+.5)*step,lat=sea.origin[1]+(y+.5)*step;
@@ -45,17 +48,16 @@ export function buildFisherGrid<T extends DisplayCell>(cells:T[],grid:Conservati
     const zone=zones.get(key);
     if(zone){
       const [,,zoneType,name,sourceFeatureId]=zone;
-      features.push({type:'Feature',geometry,properties:{id:`zone-${x}-${y}`,kind:'conservation',name,zoneType,sourceFeatureId,lon,lat}});
+      features.push({type:'Feature',geometry,properties:{id:`zone-${x}-${y}`,kind:'conservation',category:fisherZoneCategory(zoneType),name,zoneType,sourceFeatureId,lon,lat}});
       continue;
     }
     const direct=(!clipped||pointInArea(lon,lat,clipped))?measured.get(key):undefined;
     const fallback=coarse.get(gridKey(lon,lat,0.05,sea.origin));
     const source=direct||fallback,coverage=direct?'measured':fallback?'estimate':'unknown';
     features.push({type:'Feature',geometry,properties:{
-      id:direct?.id||`${coverage}-${x}-${y}`,kind:'environment',coverage,lon,lat,
+      id:direct?.id||`${coverage}-${x}-${y}`,kind:'environment',coverage,category:source?scoreCategory(source.currentScore!):'unknown',lon,lat,
       name:direct?'Data terukur':fallback?'Perkiraan':'Belum ada data',
-      ...(source?{sourceCellId:source.id,sourceResolution:source.resolution,observedEnd:source.observed_end}:{}),
-      ...(direct?{score:direct.currentScore!,priority:priorityIds.has(direct.id)}:{}),
+      ...(source?{sourceCellId:source.id,sourceResolution:source.resolution,observedEnd:source.observed_end,score:source.currentScore!,priority:source.currentScore!>=HIGH_SCORE_MINIMUM}:{}),
     }});
   }
   return {areas:{type:'FeatureCollection' as const,features},blocked,recommended,priorityIds};
