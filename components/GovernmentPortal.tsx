@@ -1,31 +1,55 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/client';
-import { MapView, type MapPin } from './MapView';
+import { satelliteSignal } from '@/lib/review';
+import { MapView, type MapAreaProperties, type MapAreas, type MapPin } from './MapView';
+import { AccessError, ReportCards, ReportFilters, filterReports, useReviewData } from './ReviewReports';
 
-type Observation={id:string;type:string;lon:number;lat:number;source_name:string;source_product_id:string;observed_end:string;quality_flags:unknown;limitations:string;metrics:Record<string,unknown>};
-type Cell={id:string;lon:number;lat:number;observed_end:string;currentScore:number|null;sst_c:number|null;chlorophyll_mg_m3:number|null;zoning_verified:boolean};
 type Source={id?:string;source_name:string;status:string;latest_check_at:string|null;latest_usable_observation_at:string|null;error_code?:string};
 const when=(date?:string|null)=>date?new Intl.DateTimeFormat('id-ID',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Jakarta'}).format(new Date(date))+' WIB':'Belum tersedia';
 
 export function GovernmentPortal(){
-  const [observations,setObservations]=useState<Observation[]>([]),[cells,setCells]=useState<Cell[]>([]),[sources,setSources]=useState<Source[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
-  useEffect(()=>{Promise.all([api('observations'),api('environment-cells'),api('data-health')]).then(([o,c,h])=>{setObservations(o.items||[]);setCells(c.items||[]);setSources(h.runs||h.sources||[]);setError('');}).catch(e=>setError((e as Error).message)).finally(()=>setLoading(false));},[]);
-  const heat=observations.filter(o=>o.type==='heat_stress'),optical=observations.filter(o=>o.type==='optical_change');
-  const usable=cells.filter(c=>c.currentScore!==null),fresh=usable.filter(c=>Date.now()-Date.parse(c.observed_end)<=7*86400000);
-  const latest=[...observations].sort((a,b)=>Date.parse(b.observed_end)-Date.parse(a.observed_end))[0];
-  const pins:MapPin[]=useMemo(()=>observations.map(o=>({id:o.id,lon:o.lon,lat:o.lat,kind:'observation',label:`${o.type==='heat_stress'?'Konteks panas':'Perubahan optik'} · ${when(o.observed_end)}`})),[observations]);
-  const actions=[
-    {title:'Validasi zonasi sebelum rekomendasi penangkapan',why:'Peta nelayan memakai enam poligon rujukan BIG untuk TN Kepulauan Seribu bagian utara. Poligon Kepulauan Seribu Selatan dan aturan pemanfaatan tiap zona belum terverifikasi.',step:'Minta geometri terbaru dan aturan kegiatan dari KKP/otoritas taman nasional, cocokkan dengan keputusan 2026, lalu tinjau tumpang tindihnya dengan sel perairan.'},
-    ...(heat.length?[{title:'Tinjau tekanan panas pada area terpantau',why:`${heat.length} observasi konteks panas tersedia; ini belum membuktikan pemutihan karang.`,step:'Bandingkan seri suhu dan DHW dengan survei karang lapangan sebelum menetapkan lokasi pemulihan.'}]:[{title:'Lengkapi pemantauan terumbu karang',why:'Belum ada observasi konteks panas yang dipublikasikan.',step:'Jalankan ingest NOAA dan rencanakan survei kondisi karang untuk memperoleh baseline.'}]),
-    ...(optical.length?[{title:'Selidiki perubahan optik',why:`${optical.length} observasi perubahan optik tersedia; penyebabnya belum diketahui.`,step:'Cek citra sebelum/sesudah, kekeruhan, pasang surut, dan pengamatan lapangan sebelum menyimpulkan kerusakan.'}]:[{title:'Bangun baseline citra pesisir',why:'Belum ada perbandingan optik terpublikasi.',step:'Jalankan pipeline Sentinel-2 pada citra dengan kualitas layak dan tinjau hasilnya secara manual.'}]),
-    {title:'Lengkapi indikator mangrove, abrasi, dan sampah',why:'Ketiga masalah ini belum memiliki pengukuran khusus pada dashboard.',step:'Hubungkan survei mangrove, garis pantai berkala, dan pemantauan sampah dengan sumber serta waktu pengamatan yang jelas.'}
+  const {items,observations,cells,error,loading}=useReviewData();
+  const [sources,setSources]=useState<Source[]>([]),[category,setCategory]=useState(''),[status,setStatus]=useState('open'),[cellKey,setCellKey]=useState<string|null>(null);
+  useEffect(()=>{api('data-health').then(h=>setSources(h.runs||h.sources||[])).catch(()=>setSources([]));},[]);
+  const filtered=filterReports(items,category,status);
+  const visibleCells=useMemo(()=>[...cells.values()].filter(c=>c.level),[cells]);
+  const areas:MapAreas=useMemo(()=>({type:'FeatureCollection',features:visibleCells.map(c=>({type:'Feature' as const,geometry:{type:'Polygon' as const,coordinates:[[[c.west,c.south],[c.east,c.south],[c.east,c.north],[c.west,c.north],[c.west,c.south]]]},properties:{id:`problem-${c.key}`,kind:'problem' as const,level:c.level!,name:`Sel ${c.code}`}}))}),[visibleCells]);
+  const pins:MapPin[]=useMemo(()=>visibleCells.filter(c=>c.open>0).map(c=>({id:`count-${c.key}`,lon:(c.west+c.east)/2,lat:(c.south+c.north)/2,kind:'report',label:`Sel ${c.code}: ${c.open} laporan terbuka`,count:c.open})),[visibleCells]);
+  const selectCell=useCallback((p:MapAreaProperties)=>{if(p.kind==='problem')setCellKey(p.id.replace('problem-',''));},[]);
+  const selectPin=useCallback((p:MapPin)=>setCellKey(p.id.replace('count-','')),[]);
+  const focusCell=cellKey?cells.get(cellKey):undefined;
+  const listed=focusCell?filtered.filter(r=>focusCell.reports.some(x=>x.id===r.id)):filtered;
+  const open=items.filter(r=>['submitted','under_review','needs_information'].includes(r.status));
+  const stats=[
+    {label:'Laporan perlu tindak lanjut',value:open.length,note:'90 hari terakhir'},
+    {label:'Dalam verifikasi',value:items.filter(r=>['under_review','needs_information'].includes(r.status)).length,note:'sedang dicek petugas'},
+    {label:'Sel bermasalah',value:visibleCells.filter(c=>c.level==='problem').length,note:`${visibleCells.filter(c=>c.level==='watch').length} sel perlu dicek`},
+    {label:'Terverifikasi',value:items.filter(r=>r.status==='corroborated').length,note:'oleh petugas'},
   ];
-  return <section className="page government-page"><div className="page-heading"><div><p className="eyebrow">PEMERINTAH · PEMANTAUAN EKOSISTEM</p><h1>Prioritas pemulihan pesisir</h1><p>Ringkasan data laut dan langkah berikutnya untuk peninjauan manusia di area pilot.</p></div><a className="secondary link-button" href="/dashboard/data-health">Periksa sumber data</a></div>
-    {loading&&<p role="status">Memuat data pilot…</p>}{error&&<p className="error" role="alert">{error}</p>}
-    <div className="stats-row govt-stats"><div><strong>{heat.length}</strong><span>observasi konteks panas</span></div><div><strong>{optical.length}</strong><span>perubahan optik</span></div><div><strong>{fresh.length}</strong><span>sel laut terbaru</span></div><div><strong>{sources.filter(s=>s.status==='success').length}/{sources.length}</strong><span>pemeriksaan berhasil</span></div></div>
-    <div className="government-summary panel"><h2>Ringkasan saat ini</h2>{observations.length===0&&usable.length===0?<p>Belum ada data satelit atau laut terpublikasi yang cukup untuk menyimpulkan kondisi ekosistem. Jalankan pipeline sumber dan periksa hasilnya sebelum mengambil keputusan.</p>:<p>Data pilot memuat {observations.length} observasi satelit dan {usable.length} sel perairan dengan indeks. Observasi terbaru: {when(latest?.observed_end||usable[0]?.observed_end)}. Angka ini menunjukkan cakupan pemantauan, bukan jumlah ekosistem yang rusak.</p>}<p className="limitation">Belum tersedia pengukuran langsung kerusakan mangrove, abrasi, sampah laut, atau hasil tangkapan. Indikator SST, klorofil, panas karang, dan perubahan optik tidak boleh diartikan sebagai diagnosis tunggal.</p></div>
-    <div className="content-grid"><div><h2>Peta bukti terpublikasi</h2><div className="map-frame govt-map"><MapView pins={pins} onSelect={pin=>window.location.href=`/observations/${pin.id}`}/></div><p className="limitation">Penanda menunjukkan titik observasi, bukan batas kerusakan atau batas hukum kawasan konservasi.</p><h2>Observasi terbaru</h2>{observations.length===0?<div className="empty">Belum ada observasi terpublikasi.</div>:observations.slice(0,8).map(o=><a className="data-card" href={`/observations/${o.id}`} key={o.id}><span className="eyebrow">{o.type==='heat_stress'?'KONTEKS PANAS':'PERUBAHAN OPTIK'}</span><strong>{o.source_name}</strong><span>Diamati {when(o.observed_end)}</span><small>{o.source_product_id} · {o.limitations}</small></a>)}</div>
-      <div><h2>Langkah berikutnya</h2>{actions.map((a,i)=><article className="panel action-card" key={a.title}><span className="eyebrow">PRIORITAS {i+1}</span><h3>{a.title}</h3><p>{a.why}</p><p><strong>Tindak lanjut:</strong> {a.step}</p></article>)}<div className="panel"><h2>Kesehatan sumber</h2>{sources.length===0?<p>Belum ada catatan pemeriksaan sumber.</p>:sources.slice(0,5).map((s,i)=><p key={s.id||i}><strong>{s.source_name}</strong> · {s.status}<br/><small>Data layak terakhir: {when(s.latest_usable_observation_at)}{s.error_code?` · ${s.error_code}`:''}</small></p>)}<a href="/dashboard/data-health">Lihat seluruh catatan →</a></div></div></div>
+  return <section className="page government-page">
+    <div className="page-heading"><div><h1>Peta masalah wilayah</h1><p>Area pilot · laporan nelayan dicocokkan dengan indikasi satelit</p></div><ReportFilters {...{category,setCategory,status,setStatus}}/></div>
+    {loading&&<p role="status">Memuat laporan dan observasi…</p>}{error&&<AccessError message={error}/>}
+    <div className="stats-row govt-stats">{stats.map(s=><div key={s.label}><strong>{s.value}</strong><span>{s.label}</span><small>{s.note}</small></div>)}</div>
+    <div className="problem-layout">
+      <div className="panel problem-map-panel">
+        <div className="panel-head"><h2>Kondisi per sel</h2><div className="map-legend inline"><span><i className="legend-area core-area"/>Bermasalah</span><span><i className="legend-area use-area"/>Perlu dicek</span><span><i className="legend-dot count-dot"/>Laporan terbuka</span></div></div>
+        <div className="map-frame govt-map"><MapView pins={pins} areas={areas} onSelect={selectPin} onAreaSelect={selectCell} selectedId={cellKey?`problem-${cellKey}`:undefined}/></div>
+        <p className="limitation">Sel 0,05° (±5,5 km). <strong>Bermasalah</strong>: ada laporan terverifikasi, ≥2 laporan terbuka, atau laporan yang didukung indikasi satelit. <strong>Perlu dicek</strong>: satu laporan, atau indikasi satelit saja. Kotak tanpa warna berarti belum ada laporan atau indikasi, bukan berarti kondisinya baik.</p>
+      </div>
+      <div className="panel">
+        <div className="panel-head"><h2>{focusCell?`Laporan · sel ${focusCell.code}`:'Laporan masuk'}</h2>{focusCell?<button className="text-button" onClick={()=>setCellKey(null)}>Semua sel</button>:<a href="/government/reports">Lihat semua</a>}</div>
+        {focusCell&&focusCell.satellite.length>0&&<p className="notice">{focusCell.satellite.map(o=>satelliteSignal(o).label).join(' · ')}</p>}
+        {!loading&&!error&&<ReportCards items={listed.slice(0,8)} cells={cells}/>}
+      </div>
+    </div>
+    <div className="panel source-panel">
+      <div className="panel-head"><h2>Sumber satelit</h2><a href="/dashboard/data-health">Kesehatan data →</a></div>
+      <p className="limitation">Satelit memberi indikasi, bukan bukti kerusakan. Panas karang NOAA dan perubahan optik Sentinel-2 hanya tersedia di beberapa titik studi; mangrove, abrasi, dan sampah bergantung pada laporan nelayan.</p>
+      <div className="source-grid">
+        <div><h3>Observasi 60 hari terakhir</h3>{observations.length===0?<p>Belum ada observasi terpublikasi.</p>:observations.slice(0,6).map(o=>{const s=satelliteSignal(o);return <p key={o.id}><a href={`/observations/${o.id}`}>{s.label}</a><br/><small>{when(o.observed_end)}{s.indication?' · ada indikasi':''}</small></p>;})}</div>
+        <div><h3>Pemeriksaan sumber</h3>{sources.length===0?<p>Belum ada catatan pemeriksaan sumber.</p>:sources.slice(0,5).map((s,i)=><p key={s.id||i}><strong>{s.source_name}</strong> · {s.status}<br/><small>Data layak terakhir: {when(s.latest_usable_observation_at)}{s.error_code?` · ${s.error_code}`:''}</small></p>)}</div>
+      </div>
+    </div>
   </section>;
 }

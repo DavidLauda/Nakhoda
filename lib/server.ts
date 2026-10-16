@@ -29,12 +29,18 @@ export async function identity(request: NextRequest): Promise<Identity> {
   if (profileError || !data) throw new ApiError(403, 'missing_profile', 'Profil akun belum tersedia.');
   const quickLogin = auth.user.is_anonymous === true;
   const portal = quickLogin ? (auth.user.user_metadata?.portal === 'government' ? 'government' : 'fisherman') : data.role === 'fisherman' ? 'fisherman' : 'government';
-  return { id: auth.user.id, role: quickLogin ? 'fisherman' : data.role as Role, displayName: quickLogin ? (portal === 'government' ? 'Akses Pemerintah' : 'Akses Nelayan') : data.display_name, isAnonymous: quickLogin, portal };
+  // Quick-entry government sessions review the pilot area only while the server flag is on (judging window).
+  const quickRole: Role = portal === 'government' && process.env.QUICK_LOGIN_FULL_ACCESS === 'true' ? 'reviewer' : 'fisherman';
+  return { id: auth.user.id, role: quickLogin ? quickRole : data.role as Role, displayName: quickLogin ? (portal === 'government' ? 'Akses Pemerintah' : 'Akses Nelayan') : data.display_name, isAnonymous: quickLogin, portal };
 }
 
 export async function reviewer(user: Identity, areaId: string) {
   if (user.role === 'admin') return;
   if (user.role !== 'reviewer') throw new ApiError(403, 'role_forbidden', 'Akses peninjau diperlukan.');
+  if (user.isAnonymous) {
+    if (areaId !== await pilotAreaId()) throw new ApiError(403, 'area_forbidden', 'Akun tidak ditugaskan ke area ini.');
+    return;
+  }
   const { data } = await serviceDb().from('area_memberships').select('area_id').eq('user_id', user.id).eq('area_id', areaId).maybeSingle();
   if (!data) throw new ApiError(403, 'area_forbidden', 'Akun tidak ditugaskan ke area ini.');
 }

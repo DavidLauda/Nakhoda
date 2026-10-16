@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { ExpressionSpecification, GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
 
-export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string};
-export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;category?:'high'|'moderate'|'caution'|'avoid'|'unknown';zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
+export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string;count?:number};
+export type MapAreaProperties={id:string;kind:'conservation'|'environment'|'problem';level?:'problem'|'watch';name:string;category?:'high'|'moderate'|'caution'|'avoid'|'unknown';zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
 export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
 const emptyAreas:MapAreas={type:'FeatureCollection',features:[]};
@@ -25,7 +25,7 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
   // Callbacks change without rebuilding map.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[style]);
-  useEffect(()=>{if(!map.current)return;markers.current.forEach(x=>x.remove());markers.current=[];import('maplibre-gl').then(({default:maplibre})=>{if(!map.current)return;for(const pin of pins){const el=document.createElement('button');el.type='button';el.className=`map-pin ${pin.kind}`;el.title=pin.label;el.setAttribute('aria-label',pin.label);el.onclick=e=>{e.stopPropagation();onSelect?.(pin);};markers.current.push(new maplibre.Marker({element:el}).setLngLat([pin.lon,pin.lat]).addTo(map.current));}});return()=>{markers.current.forEach(x=>x.remove());markers.current=[];};},[pins,onSelect,mapReady]);
+  useEffect(()=>{if(!map.current)return;markers.current.forEach(x=>x.remove());markers.current=[];import('maplibre-gl').then(({default:maplibre})=>{if(!map.current)return;for(const pin of pins){const el=document.createElement('button');el.type='button';el.className=`map-pin ${pin.kind}${pin.count?' with-count':''}`;if(pin.count)el.textContent=String(pin.count);el.title=pin.label;el.setAttribute('aria-label',pin.label);el.onclick=e=>{e.stopPropagation();onSelect?.(pin);};markers.current.push(new maplibre.Marker({element:el}).setLngLat([pin.lon,pin.lat]).addTo(map.current));}});return()=>{markers.current.forEach(x=>x.remove());markers.current=[];};},[pins,onSelect,mapReady]);
   useEffect(()=>{const m=map.current;if(!m)return;
     const install=()=>{
       if(!styleReady(m))return;
@@ -36,6 +36,8 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
       if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.4}});
       if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':areaFillColor,'fill-opacity':0.35}});
       if(!m.getLayer('environment-selected'))m.addLayer({id:'environment-selected',type:'line',source:'area-overlays',filter:selectedFilter(selectedRef.current),paint:{'line-color':'#0b2a3c','line-width':3.5}});
+      if(!m.getLayer('problem-fill'))m.addLayer({id:'problem-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'problem'],paint:{'fill-color':['match',['get','level'],'problem','#c8553d','#f0c24b'],'fill-opacity':0.6}});
+      if(!m.getLayer('problem-outline'))m.addLayer({id:'problem-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'problem'],paint:{'line-color':'#0b2a3c','line-width':1,'line-opacity':0.5}});
       if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.4}});
       applySelected(m,selectedRef.current);
     };
@@ -45,7 +47,8 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
     const selectEnvironment=(e:MapLayerMouseEvent)=>{if(!m.style)return;if(m.queryRenderedFeatures(e.point,{layers:['conservation-fill']}).length)return;const p=e.features?.[0]?.properties as MapAreaProperties|undefined;if(p)onAreaSelect?.(p);};
     m.on('click','conservation-fill',selectConservation);
     m.on('click','environment-fill',selectEnvironment);
-    return()=>{m.off('styledata',install);m.off('idle',install);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);};
+    m.on('click','problem-fill',selectConservation);
+    return()=>{m.off('styledata',install);m.off('idle',install);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);m.off('click','problem-fill',selectConservation);};
   },[areas,onAreaSelect,mapReady]);
   useEffect(()=>{selectedRef.current=selectedId;applySelected(map.current,selectedId);},[selectedId,mapReady]);
   useEffect(()=>{if(focus&&map.current)map.current.easeTo({center:[focus.lon,focus.lat],zoom:Math.max(map.current.getZoom(),10)});},[focus,mapReady]);

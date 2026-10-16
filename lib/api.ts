@@ -6,6 +6,7 @@ import { ApiError, assertDb, bbox, failure, identity, inBbox, json, pilotAreaId,
 import { allowedRecipient, contentHash, emailMode, sendGmail } from './email';
 import { PLAYBOOK_VERSION, recommendation } from './playbook';
 import { snap250, presenceIsFresh } from './geo';
+import { OPEN_STATUSES, REVIEW_ACTIONS, problemCell } from './review';
 
 const uuid=z.string().uuid();
 const reportSchema=z.object({clientId:uuid,category:z.enum(['coral_concern','mangrove_damage','shoreline_erosion','marine_waste','water_pollution','other']),lon:z.number(),lat:z.number(),locationMethod:z.enum(['gps','manual']),accuracyM:z.number().nonnegative().optional(),observedAt:z.string(),description:z.string().min(10).max(4000),textOnlyReason:z.string().max(500).optional()});
@@ -142,6 +143,55 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
       const write=await db.from('shared_presence').upsert({user_id:user.id,trip_id:input.tripId,pseudonym:`Nelayan-${user.id.slice(0,6)}`,approximate_lon:snapped.lon,approximate_lat:snapped.lat,heartbeat_at:new Date().toISOString(),sharing_enabled:true});assertDb(write.error,'Berbagi posisi');
       return json({sharing:true,approximatePosition:snapped,expiresAfterSeconds:180});
     }
+  }
+  if(path[0]==='review' && path[1]==='reports') {
+    const areaId=await pilotAreaId();
+    await reviewer(user,areaId);
+    const fields='id,category,lon,lat,observed_at,submitted_at,status,description,text_only_reason,location_method,accuracy_m,reviewer_note_public,revision';
+    if(method==='GET' && path.length===2) {
+      const since=new Date(Date.now()-90*86400000).toISOString();
+      const [r,o]=await Promise.all([
+        db.from('reports').select(fields).eq('area_id',areaId).neq('status','pending_upload').gte('submitted_at',since).order('submitted_at',{ascending:false}).limit(300),
+        db.from('observations').select('id,type,lon,lat,observed_end,metrics').eq('state','published').gte('observed_end',new Date(Date.now()-60*86400000).toISOString()).limit(200),
+      ]);
+      const items=dataOrThrow(r.data,r.error,'Laporan')||[];
+      const media=items.length?await db.from('report_media').select('report_id').in('report_id',items.map(x=>x.id)).eq('upload_status','complete'):{data:[],error:null};
+      assertDb(media.error,'Foto');
+      const photos=new Map<string,number>();for(const m of media.data||[])photos.set(m.report_id,(photos.get(m.report_id)||0)+1);
+      return json({items:items.map(x=>({...x,photoCount:photos.get(x.id)||0})),observations:dataOrThrow(o.data,o.error,'Observasi')||[]});
+    }
+    const q=await db.from('reports').select('*').eq('id',path[2]).maybeSingle();
+    assertDb(q.error,'Laporan');
+    if(!q.data||q.data.area_id!==areaId||q.data.status==='pending_upload') throw new ApiError(404,'not_found','Laporan tidak ditemukan.');
+    const report=q.data;
+    if(method==='GET' && path.length===3) {
+      const cell=problemCell(report.lon,report.lat),observed=Date.parse(report.observed_at);
+      const [m,f,link,near,obs]=await Promise.all([
+        db.from('report_media').select('id').eq('report_id',report.id).eq('upload_status','complete'),
+        db.from('field_validations').select('stance,distance_m,time_separation_hours,observation_id').eq('report_id',report.id).maybeSingle(),
+        db.from('case_evidence').select('case_id').eq('report_id',report.id).maybeSingle(),
+        db.from('reports').select('id,category,status,observed_at').eq('area_id',areaId).neq('id',report.id).neq('status','pending_upload').gte('lon',cell.west).lt('lon',cell.east).gte('lat',cell.south).lt('lat',cell.north).gte('observed_at',new Date(observed-60*86400000).toISOString()),
+        db.from('observations').select('id,type,lon,lat,observed_end,metrics,source_name').eq('state','published').gte('lon',cell.west-0.05).lte('lon',cell.east+0.05).gte('lat',cell.south-0.05).lte('lat',cell.north+0.05).gte('observed_end',new Date(observed-30*86400000).toISOString()).lte('observed_end',new Date(observed+30*86400000).toISOString()),
+      ]);
+      const caseId=link.data?.case_id as string|undefined;
+      const kase=caseId?await db.from('cases').select('id,status,updated_at').eq('id',caseId).maybeSingle():null;
+      const history=await db.from('audit_events').select('entity_type,action,reason,metadata,created_at').in('entity_id',caseId?[report.id,caseId]:[report.id]).order('created_at',{ascending:true}).limit(50);
+      const item=Object.fromEntries(Object.entries(report).filter(([k])=>!['author_id','area_id','client_id'].includes(k))); // reviewers never see who reported
+      return json({item,cell,media:dataOrThrow(m.data,m.error,'Foto')||[],fieldValidation:f.data,case:kase?.data||null,sameCell:dataOrThrow(near.data,near.error,'Laporan sekitar')||[],observations:dataOrThrow(obs.data,obs.error,'Observasi')||[],history:dataOrThrow(history.data,history.error,'Riwayat')||[]});
+    }
+    if(method==='POST' && path[3]==='status') {
+      const x=await body(request,z.object({status:z.enum(REVIEW_ACTIONS),note:z.string().trim().max(500).optional(),expectedRevision:z.number().int().positive()}));
+      if(x.expectedRevision!==report.revision) throw new ApiError(409,'revision_conflict','Laporan telah diubah petugas lain. Muat ulang.');
+      const updated=await db.from('reports').update({status:x.status,revision:report.revision+1,...(x.note?{reviewer_note_public:x.note}:{})}).eq('id',report.id).eq('revision',report.revision).select(fields).single();
+      assertDb(updated.error,'Ubah status laporan');
+      const caseStatus=x.status==='corroborated'?'ready_for_referral':OPEN_STATUSES.includes(x.status)?'reviewing':'closed_without_resolution';
+      const link=await db.from('case_evidence').select('case_id').eq('report_id',report.id).maybeSingle();
+      // Only move cases that have not progressed past review; a referred case keeps its own lifecycle.
+      if(link.data?.case_id) await db.from('cases').update({status:caseStatus,updated_at:new Date().toISOString()}).eq('id',link.data.case_id).in('status',['new','reviewing','ready_for_referral']);
+      await db.from('audit_events').insert({actor_id:user.id,entity_type:'report',entity_id:report.id,action:'report_status_changed',reason:x.note||null,metadata:{from:report.status,to:x.status}});
+      return json({item:updated.data});
+    }
+    throw new ApiError(404,'not_found','Rute tidak ditemukan.');
   }
   if(path[0]==='reports') {
     if(method==='GET' && path.length===1) {

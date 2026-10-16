@@ -6,6 +6,7 @@ import { TripTracker, TripHistory } from './Trips';
 import { CaseList, CaseDetail, DataHealth, AdminPanel } from './Review';
 import { FisherPortal } from './FisherPortal';
 import { GovernmentPortal } from './GovernmentPortal';
+import { ReviewReportList, ReviewReportDetail } from './ReviewReports';
 
 export type AppUser={id:string;role:'fisherman'|'reviewer'|'admin';displayName:string;isAnonymous:boolean;portal:'fisherman'|'government'};
 const dt=(value?:string)=>value?new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'}).format(new Date(value))+' WIB':'Belum ada';
@@ -23,6 +24,8 @@ export function PesisirApp({route}:{route:string}) {
   const parts=route.split('/');
   let content:React.ReactNode;
   if(route==='' || route==='map' || route==='government') content=government?<GovernmentPortal/>:<FisherPortal/>;
+  else if(route==='government/reports') content=government?<ReviewReportList/>:<FisherPortal/>;
+  else if(parts[0]==='government'&&parts[1]==='reports'&&parts[2]) content=government?<ReviewReportDetail id={parts[2]}/>:<FisherPortal/>;
   else if(route==='dashboard') content=government?<GovernmentPortal/>:<FisherPortal/>;
   else if(route==='dashboard/cases') content=government?<CaseList/>:<FisherPortal/>;
   else if(parts[0]==='dashboard'&&parts[1]==='cases'&&parts[2]) content=<CaseDetail id={parts[2]} user={user}/>;
@@ -36,20 +39,25 @@ export function PesisirApp({route}:{route:string}) {
   else if(route==='settings') content=<Settings user={user}/>;
   else content=government?<GovernmentPortal/>:<FisherPortal/>;
   const current=route===''?home:`/${route}`;
-  const links:[string,string,string,IconName][]=government?[['/government','Dasbor ekosistem','Ekosistem','chart'],['/dashboard/data-health','Kesehatan data','Data','list']]:[['/map','Peta perairan','Peta','map']];
+  const links:[string,string,string,IconName][]=government?[['/government','Peta masalah','Peta','map'],['/government/reports','Laporan masuk','Laporan','inbox'],['/dashboard/data-health','Kesehatan data','Data','pulse']]:[['/map','Peta perairan','Peta','map'],['/reports/new','Buat laporan','Lapor','camera'],['/reports','Laporanku','Laporanku','list']];
   links.push(['/settings','Akun & keluar','Akun','user']);
+  // The longest matching link is active, so /government/reports/x highlights "Laporan masuk", not "Peta masalah".
+  const active=links.map(([href])=>href).filter(href=>current===href||current.startsWith(`${href}/`)).sort((a,b)=>b.length-a.length)[0];
   const online=typeof navigator==='undefined'||navigator.onLine;
-  return <div className="app-shell"><aside className="sidebar"><a className="brand" href={home}><span className="brand-mark"><Icon name="compass" size={22}/></span>Nakhoda</a><p className="sidebar-sub">{government?'Pemantauan ekosistem':'Peta untuk nelayan'} · <span className="status-pill">Pilot</span></p><nav aria-label="Navigasi utama">{links.map(([href,label,,icon])=><a key={href} href={href} aria-current={current===href?'page':undefined}><Icon name={icon} size={20}/>{label}</a>)}</nav><div className="sidebar-foot"><span className="role-chip">{government?'Pemerintah':'Nelayan'}</span><span>{user.displayName}</span></div></aside><main className="main"><header className="topbar"><a className="mobile-brand" href={home}>Nakhoda</a><span>Pilot · Teluk Jakarta & Kepulauan Seribu</span><span className={`online-indicator${online?'':' offline'}`} aria-live="polite">{online?'Online':'Offline'}</span></header>{content}</main><nav className="bottom-nav" aria-label="Navigasi ponsel">{links.map(([href,,short,icon])=><a key={href} href={href} aria-current={current===href?'page':undefined}><Icon name={icon}/>{short}</a>)}</nav></div>;
+  return <div className="app-shell"><aside className="sidebar"><a className="brand" href={home}><span className="brand-mark"><Icon name="compass" size={22}/></span>Nakhoda</a><p className="sidebar-sub">{government?'Pemantauan ekosistem':'Peta untuk nelayan'} · <span className="status-pill">Pilot</span></p><nav aria-label="Navigasi utama">{links.map(([href,label,,icon])=><a key={href} href={href} aria-current={active===href?'page':undefined}><Icon name={icon} size={20}/>{label}</a>)}</nav><div className="sidebar-foot"><span className="role-chip">{government?'Pemerintah':'Nelayan'}</span><span>{user.displayName}</span></div></aside><main className="main"><header className="topbar"><a className="mobile-brand" href={home}>Nakhoda</a><span>Pilot · Teluk Jakarta & Kepulauan Seribu</span><span className={`online-indicator${online?'':' offline'}`} aria-live="polite">{online?'Online':'Offline'}</span></header>{content}</main><nav className="bottom-nav" aria-label="Navigasi ponsel">{links.map(([href,,short,icon])=><a key={href} href={href} aria-current={active===href?'page':undefined}><Icon name={icon}/>{short}</a>)}</nav></div>;
 }
 
-type IconName='map'|'chart'|'list'|'user'|'compass'|'boat';
+type IconName='map'|'chart'|'list'|'user'|'compass'|'boat'|'camera'|'inbox'|'pulse';
 const iconPaths:Record<IconName,React.ReactNode>={
   map:<path d="M9 4 3 6.5v13L9 17l6 3 6-2.5v-13L15 7 9 4Zm0 0v13m6-10v13"/>,
   chart:<path d="M4 20V10m6 10V4m6 16v-7m4 7H3"/>,
   list:<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>,
   user:<><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
   compass:<><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></>,
-  boat:<path d="M3 15h18l-2.5 5h-13L3 15Zm9-12v12m0-12 6 9h-6"/>
+  boat:<path d="M3 15h18l-2.5 5h-13L3 15Zm9-12v12m0-12 6 9h-6"/>,
+  camera:<><path d="M4 8h3l1.5-2h7L17 8h3v11H4V8Z"/><circle cx="12" cy="13" r="3.2"/></>,
+  inbox:<path d="M4 13h4l1.5 3h5L16 13h4M4 13l2.5-8h11l2.5 8v6H4v-6Z"/>,
+  pulse:<path d="M3 12h4l2-6 4 12 2-6h6"/>
 };
 function Icon({name,size=24}:{name:IconName;size?:number}){return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;}
 
