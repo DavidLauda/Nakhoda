@@ -18,6 +18,14 @@ small{color:var(--muted)}
 .brand{font-family:var(--display);font-size:1.4rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--ink);display:inline-flex;align-items:center;gap:8px}
 .brand-mark{display:inline-flex;color:var(--teal)}
 .brand.large{font-size:1.9rem}
+.pwa-install{margin:16px 0;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--white);text-align:left}
+.pwa-install-heading{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pwa-install-heading img{border-radius:12px;flex:0 0 auto}
+.pwa-install h2{font-size:1.1rem;margin:0 0 4px}
+.pwa-install-heading p,.pwa-install-notice,.pwa-install-help{font-size:.85rem;color:var(--muted);margin:0}
+.pwa-install-notice,.pwa-install-help{margin-top:12px}
+.pwa-install-help ol{padding-left:20px;margin:0 0 8px}
+.pwa-install-help p{margin:0}
 .app-shell{display:flex;min-height:100vh}
 .sidebar{width:248px;flex:0 0 248px;background:var(--navy);color:var(--white);padding:24px 16px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .sidebar .brand{color:var(--white)}

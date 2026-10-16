@@ -9,5 +9,13 @@ if(browserKey?.startsWith('eyJ')) {
 if(browserKey?.startsWith('sb_secret_') || legacyServiceRole) {
   throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY berisi kunci rahasia. Gunakan publishable key (sb_publishable_...) dan rotasi kunci rahasia yang terpapar.');
 }
-const nextConfig:NextConfig={outputFileTracingRoot:process.cwd()};
+const nextConfig:NextConfig={
+  outputFileTracingRoot:process.cwd(),
+  async headers(){
+    return [
+      {source:'/sw.js',headers:[{key:'Content-Type',value:'application/javascript; charset=utf-8'},{key:'Cache-Control',value:'no-cache, no-store, must-revalidate'}]},
+      {source:'/manifest.webmanifest',headers:[{key:'Cache-Control',value:'no-cache, no-store, must-revalidate'}]},
+    ];
+  },
+};
 export default nextConfig;

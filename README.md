@@ -7,6 +7,10 @@ Nakhoda is a Bahasa Indonesia hackathon PWA for a Teluk Jakarta and Kepulauan Se
 
 Email delivery, field reports, trip tracking, case review, and administration remain in the code as legacy pilot features, but they are not in the primary navigation or demo flow. The current priority is the fisher map and ecosystem dashboard.
 
+## Deployment ke Vercel
+
+Ikuti [panduan deploy Vercel — 16 Oktober 2026](docs/deployment/2026-10-16-panduan-deploy-vercel.md) untuk import repository, mengisi environment variables, menguji Quick Login dan tampilan HP, serta menyiapkan pemasangan PWA.
+
 ## Local start
 
 1. Install Node.js 22+ and run `npm ci`. For the satellite pipeline, also install Python 3.12+ and `python -m pip install -r pipeline/requirements.txt`.
