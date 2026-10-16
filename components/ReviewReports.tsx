@@ -2,47 +2,64 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/client';
 import { OPEN_STATUSES, REPORT_CATEGORIES, REPORT_STATUS, cellLevel, confidence, problemCell, satelliteSignal, type ReviewAction, type SatelliteObservation } from '@/lib/review';
+import { ObservationImages } from './ObservationImages';
 
 export type ReviewReport={id:string;category:string;lon:number;lat:number;observed_at:string;submitted_at:string;status:string;description:string;text_only_reason:string|null;location_method:string;accuracy_m:number|null;reviewer_note_public:string|null;revision:number;photoCount?:number};
 export type ProblemCell=ReturnType<typeof problemCell>&{reports:ReviewReport[];open:number;verified:number;satellite:SatelliteObservation[];level:'problem'|'watch'|null};
 const when=(date?:string|null)=>date?new Intl.DateTimeFormat('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}).format(new Date(date))+' WIB':'—';
 export const categoryLabel=(c:string)=>REPORT_CATEGORIES[c]||c;
 export const statusLabel=(s:string)=>REPORT_STATUS[s]||s;
+export type FollowUp={caseId:string;status:string};
+export type Indication={o:SatelliteObservation;cell:ReturnType<typeof problemCell>;label:string;followUp?:FollowUp};
+const CASE_STATUS:Record<string,string>={new:'Kasus baru',reviewing:'Kasus ditinjau',ready_for_referral:'Siap dirujuk',referred:'Dirujuk',acknowledged:'Diterima instansi',in_progress:'Ditangani',resolved:'Selesai',closed_without_resolution:'Ditutup'};
+const CASE_CLOSED=['resolved','closed_without_resolution'];
 
+/** Groups reports and counted satellite indications into 0.05° cells with a level. */
+export function buildCells(items:ReviewReport[],observations:SatelliteObservation[]){
+  const map=new Map<string,ProblemCell>();
+  const at=(lon:number,lat:number)=>{const c=problemCell(lon,lat);if(!map.has(c.key))map.set(c.key,{...c,reports:[],open:0,verified:0,satellite:[],level:null});return map.get(c.key)!;};
+  for(const r of items){const c=at(r.lon,r.lat);c.reports.push(r);if(OPEN_STATUSES.includes(r.status))c.open++;if(r.status==='corroborated')c.verified++;}
+  for(const o of observations)if(satelliteSignal(o).indication)at(o.lon,o.lat).satellite.push(o);
+  for(const c of map.values())c.level=cellLevel({open:c.open,verified:c.verified,satellite:c.satellite.length>0});
+  return map;
+}
+export const CATEGORY_COLORS:Record<string,string>={coral_concern:'#d9644a',mangrove_damage:'#2f7d4f',shoreline_erosion:'#9a6a2f',marine_waste:'#3b6fb6',water_pollution:'#7b5ea7',other:'#6b7280'};
 export function useReviewData(){
-  const [items,setItems]=useState<ReviewReport[]>([]),[observations,setObservations]=useState<SatelliteObservation[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
-  useEffect(()=>{api('review/reports').then(x=>{setItems(x.items||[]);setObservations(x.observations||[]);setError('');}).catch(e=>setError((e as Error).message)).finally(()=>setLoading(false));},[]);
-  const cells=useMemo(()=>{
-    const map=new Map<string,ProblemCell>();
-    const at=(lon:number,lat:number)=>{const c=problemCell(lon,lat);if(!map.has(c.key))map.set(c.key,{...c,reports:[],open:0,verified:0,satellite:[],level:null});return map.get(c.key)!;};
-    for(const r of items){const c=at(r.lon,r.lat);c.reports.push(r);if(OPEN_STATUSES.includes(r.status))c.open++;if(r.status==='corroborated')c.verified++;}
-    for(const o of observations)if(satelliteSignal(o).indication)at(o.lon,o.lat).satellite.push(o);
-    for(const c of map.values())c.level=cellLevel({open:c.open,verified:c.verified,satellite:c.satellite.length>0});
-    return map;
-  },[items,observations]);
-  return {items,observations,cells,error,loading};
+  const [items,setItems]=useState<ReviewReport[]>([]),[observations,setObservations]=useState<SatelliteObservation[]>([]),[followUps,setFollowUps]=useState<Record<string,FollowUp>>({}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+  useEffect(()=>{api('review/reports').then(x=>{setItems(x.items||[]);setObservations(x.observations||[]);setFollowUps(x.followUps||{});setError('');}).catch(e=>setError((e as Error).message)).finally(()=>setLoading(false));},[]);
+  const cells=useMemo(()=>buildCells(items,observations),[items,observations]);
+  // Satellite-only indications become queue items of their own, newest first.
+  const indications=useMemo<Indication[]>(()=>observations.map(o=>({o,s:satelliteSignal(o)})).filter(x=>x.s.indication).map(({o,s})=>({o,cell:problemCell(o.lon,o.lat),label:s.label,followUp:followUps[o.id]})).sort((a,b)=>Date.parse(b.o.observed_end)-Date.parse(a.o.observed_end)),[observations,followUps]);
+  return {items,observations,cells,indications,followUps,error,loading};
 }
 
 export function ReportFilters({category,setCategory,status,setStatus}:{category:string;setCategory:(v:string)=>void;status:string;setStatus:(v:string)=>void}){
-  return <div className="filter-row"><label>Jenis<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Semua</option>{Object.entries(REPORT_CATEGORIES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label>Status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="open">Perlu ditindaklanjuti</option><option value="">Semua</option><option value="corroborated">Terverifikasi</option><option value="closed">Ditutup</option></select></label></div>;
+  return <div className="filter-row"><label>Jenis<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Semua</option>{Object.entries(REPORT_CATEGORIES).map(([k,v])=><option key={k} value={k}>{v}</option>)}<option value="satellite">Indikasi satelit</option></select></label><label>Status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="open">Perlu ditindaklanjuti</option><option value="">Semua</option><option value="corroborated">Terverifikasi</option><option value="closed">Ditutup</option></select></label></div>;
+}
+export function filterIndications(items:Indication[],category:string,status:string){
+  if(category&&category!=='satellite')return [];
+  return items.filter(x=>{const closed=!!x.followUp&&CASE_CLOSED.includes(x.followUp.status);return !status||(status==='open'?!closed:status==='closed'?closed:false);});
 }
 export function filterReports(items:ReviewReport[],category:string,status:string){
+  if(category==='satellite')return [];
   return items.filter(r=>(!category||r.category===category)&&(!status||(status==='open'?OPEN_STATUSES.includes(r.status):status==='closed'?['unsubstantiated','duplicate','closed'].includes(r.status):r.status===status)));
 }
 
-export function ReportCards({items,cells}:{items:ReviewReport[];cells:Map<string,ProblemCell>}){
-  if(!items.length)return <div className="empty">Belum ada laporan yang cocok. Laporan dari menu <strong>Lapor</strong> di aplikasi nelayan akan muncul di sini.</div>;
-  return <div className="review-cards">{items.map(r=>{const c=cells.get(problemCell(r.lon,r.lat).key);const others=(c?.reports.length||1)-1;return <a key={r.id} className={`review-card${r.status==='submitted'?' fresh':''}`} href={`/government/reports/${r.id}`}>
+export function ReportCards({items,cells,indications=[]}:{items:ReviewReport[];cells:Map<string,ProblemCell>;indications?:Indication[]}){
+  if(!items.length&&!indications.length)return <div className="empty">Belum ada laporan yang cocok. Laporan dari menu <strong>Lapor</strong> di aplikasi nelayan akan muncul di sini.</div>;
+  return <div className="review-cards">{indications.map(x=><a key={x.o.id} className="review-card satellite" href={`/government/indications/${x.o.id}`}>
+    <div><strong>Indikasi satelit · {x.cell.code}</strong><small>{x.label} · {when(x.o.observed_end)}</small></div>
+    <span className={`status-pill ${x.followUp?`case-${x.followUp.status}`:'status-satellite'}`}>{x.followUp?CASE_STATUS[x.followUp.status]||x.followUp.status:'Belum ditindaklanjuti'}</span></a>)}{items.map(r=>{const c=cells.get(problemCell(r.lon,r.lat).key);const others=(c?.reports.length||1)-1;return <a key={r.id} className={`review-card${r.status==='submitted'?' fresh':''}`} href={`/government/reports/${r.id}`}>
     <div><strong>{categoryLabel(r.category)} · {c?.code}</strong><small>{others?`${others+1} laporan di sel ini`:'1 laporan di sel ini'} · {when(r.submitted_at)}{c?.satellite.length?' · ada indikasi satelit':''}</small></div>
     <span className={`status-pill status-${r.status}`}>{statusLabel(r.status)}</span></a>;})}</div>;
 }
 
 export function ReviewReportList(){
-  const {items,cells,error,loading}=useReviewData(),[category,setCategory]=useState(''),[status,setStatus]=useState('open');
-  const shown=filterReports(items,category,status);
-  return <section className="page review-page"><div className="page-heading"><div><h1>Laporan masuk</h1><p>Laporan nelayan 90 hari terakhir. Identitas pelapor tidak ditampilkan.</p></div><ReportFilters {...{category,setCategory,status,setStatus}}/></div>
+  const {items,cells,indications,error,loading}=useReviewData(),[category,setCategory]=useState(''),[status,setStatus]=useState('open');
+  const shown=filterReports(items,category,status),shownIndications=filterIndications(indications,category,status);
+  return <section className="page review-page"><div className="page-heading"><div><h1>Laporan masuk</h1><p>Laporan nelayan 90 hari terakhir dan indikasi satelit 60 hari terakhir. Identitas pelapor tidak ditampilkan.</p></div><ReportFilters {...{category,setCategory,status,setStatus}}/></div>
     {loading&&<p role="status">Memuat laporan…</p>}{error&&<AccessError message={error}/>}
-    {!loading&&!error&&<ReportCards items={shown} cells={cells}/>}
+    {!loading&&!error&&<ReportCards items={shown} cells={cells} indications={shownIndications}/>}
   </section>;
 }
 
@@ -103,6 +120,50 @@ export function ReviewReportDetail({id}:{id:string}){
         </div>
         <div className="panel"><h2>Riwayat</h2><ol className="timeline">{steps.map((s,i)=><li key={i} className={s.tone}><strong>{s.label}</strong>{s.at&&<small>{when(s.at)}</small>}</li>)}</ol></div>
       </aside>
+    </div>
+  </section>;
+}
+
+const FLAG_TEXT:Record<string,string>={habitat_mask_unavailable:'belum ada peta habitat terumbu',tide_depth_turbidity_unresolved:'pasang surut, kedalaman, dan kekeruhan belum dikoreksi',low_valid_overlap:'area citra yang bisa dibandingkan sedikit'};
+/** What a satellite indication is made of, so an officer can judge it before acting. */
+export function SatelliteEvidence({o}:{o:SatelliteObservation}){
+  const s=satelliteSignal(o),m=(o.metrics||{}) as Record<string,unknown>,flags=Array.isArray(o.quality_flags)?o.quality_flags as string[]:[];
+  const optical=o.type==='optical_change';
+  return <div className="evidence-card">
+    <strong>{optical?'Perubahan warna dasar laut (Sentinel-2)':'Tekanan panas karang (NOAA)'}</strong>
+    <span>{s.label}</span>
+    <dl>
+      <dt>{optical?'Citra dibandingkan':'Periode'}</dt><dd>{o.observed_start?`${when(o.observed_start)} → `:''}{when(o.observed_end)}</dd>
+      {optical&&<><dt>Awan</dt><dd>{Math.round(Number(m.baseline_cloud_percent)||0)}% sebelum · {Math.round(Number(m.current_cloud_percent)||0)}% sesudah</dd><dt>Area terbanding</dt><dd>{o.coverage_fraction!=null?`${Math.round(o.coverage_fraction*100)}%`:'—'}</dd></>}
+      {flags.length>0&&<><dt>Keterbatasan</dt><dd>{flags.map(f=>FLAG_TEXT[f]||f).join('; ')}</dd></>}
+    </dl>
+    <small>{optical?'Artinya: warna piksel berubah di antara dua tanggal. Bisa karena karang, tetapi juga awan tipis, pasang surut, kekeruhan, atau kapal. Bukan bukti kerusakan.':'Artinya: suhu laut di atas normal cukup lama untuk memicu pemutihan. Bukan bukti karang sudah memutih.'}</small>
+    <a href={`/observations/${o.id}`}>{optical?'Lihat citra sebelum/sesudah →':'Lihat detail observasi →'}</a>
+  </div>;
+}
+
+type FullObservation=SatelliteObservation&{source_name:string;source_product_id:string;source_asset_ids:string[];limitations:string;manifest:Record<string,unknown>};
+/** Detail page for an indication that comes only from satellite data. */
+export function IndicationDetail({id}:{id:string}){
+  const {cells,followUps,error:listError}=useReviewData(),[item,setItem]=useState<FullObservation|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[created,setCreated]=useState<string|null>(null),[message,setMessage]=useState('');
+  useEffect(()=>{api(`observations/${id}`).then(x=>setItem(x.item)).catch(e=>setError((e as Error).message));},[id]);
+  if(error||listError)return <section className="page review-page"><a href="/government/reports">← Laporan masuk</a><AccessError message={error||listError}/></section>;
+  if(!item)return <section className="page review-page"><p role="status">Memuat indikasi…</p></section>;
+  const cell=problemCell(item.lon,item.lat),reports=cells.get(cell.key)?.reports||[],s=satelliteSignal(item),caseId=created||followUps[id]?.caseId;
+  async function openCase(){setBusy(true);setMessage('');try{const x=await api(`review/indications/${id}/case`,{method:'POST'});setCreated(x.caseId);setMessage('Kasus dibuat. Status dan rujukan ke instansi diatur di halaman kasus.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
+  return <section className="page review-page">
+    <a href="/government/reports">← Laporan masuk</a>
+    <div className="page-heading"><div><h1>Indikasi satelit · Sel {cell.code}</h1><p>{item.source_name} · {item.observed_start?`${when(item.observed_start)} → `:''}{when(item.observed_end)}</p></div><span className={`status-pill ${s.indication?'status-satellite':''}`}>{s.indication?'Dihitung sebagai indikasi':'Tidak dihitung'}</span></div>
+    <div className="review-detail">
+      <div className="review-main">
+        {item.type==='optical_change'&&<div className="panel"><h2>Citra yang dibandingkan</h2><ObservationImages manifest={item.manifest}/></div>}
+        <div className="panel"><h2>Isi indikasi</h2><SatelliteEvidence o={item}/><p className="limitation">Catatan sumber: {item.limitations}</p></div>
+        <div className="panel"><h2>Laporan nelayan di sel {cell.code}</h2>{reports.length?<ReportCards items={reports} cells={cells}/>:<p>Belum ada laporan nelayan di sel ini. Indikasi satelit saja belum cukup untuk menyimpulkan kondisi; minta pengecekan lapangan atau tunggu laporan nelayan.</p>}</div>
+      </div>
+      <aside className="review-side"><div className="panel action-panel"><h2>Tindak lanjut</h2>
+        {caseId?<><p>Indikasi ini sudah punya kasus{followUps[id]?` (${CASE_STATUS[followUps[id].status]||followUps[id].status})`:''}.</p><a className="primary link-button" href={`/dashboard/cases/${caseId}`}>Buka kasus & rujukan</a></>:<><p>Buat kasus bila indikasi ini perlu dicek lapangan atau dirujuk ke instansi.</p><button className="primary" disabled={busy} onClick={openCase}>{busy?'Membuat…':'Buat kasus tindak lanjut'}</button></>}
+        {message&&<p className="sheet-note" role="status">{message}</p>}
+      </div></aside>
     </div>
   </section>;
 }

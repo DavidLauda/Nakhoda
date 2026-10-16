@@ -13,7 +13,9 @@ test('satellite indications need a NOAA warning or optical candidates',()=>{
   assert.equal(satelliteSignal({type:'heat_stress',metrics:{alert_7day:{value:1}}}).indication,false);
   assert.equal(satelliteSignal({type:'heat_stress',metrics:{alert_7day:{value:2}}}).indication,true);
   assert.equal(satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:0}}).indication,false);
-  assert.equal(satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:12}}).indication,true);
+  assert.equal(satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:12,current_cloud_percent:3,baseline_cloud_percent:5}}).indication,true);
+  const cloudy=satelliteSignal({type:'optical_change',metrics:{candidate_pixel_count:1150,pixel_size_m:10,current_cloud_percent:20.82,baseline_cloud_percent:20.68}});
+  assert.equal(cloudy.indication,false);assert.match(cloudy.ignored,/awan 21%/);assert.match(cloudy.label,/11,5 ha/);
   assert.equal(satelliteSignal({type:'heat_stress',metrics:null}).indication,false);
 });
 test('cell level combines reports and satellite',()=>{

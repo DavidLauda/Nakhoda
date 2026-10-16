@@ -144,6 +144,23 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
       return json({sharing:true,approximatePosition:snapped,expiresAfterSeconds:180});
     }
   }
+  if(path[0]==='review' && path[1]==='indications' && path[2] && path[3]==='case' && method==='POST') {
+    const areaId=await pilotAreaId();
+    await reviewer(user,areaId);
+    const o=await db.from('observations').select('id,type,lon,lat,observed_end,area_id').eq('id',path[2]).eq('state','published').maybeSingle();
+    assertDb(o.error,'Observasi');
+    if(!o.data||o.data.area_id!==areaId) throw new ApiError(404,'not_found','Observasi tidak ditemukan.');
+    const existing=await db.from('case_evidence').select('case_id').eq('observation_id',o.data.id).maybeSingle();
+    assertDb(existing.error,'Kasus');
+    if(existing.data) return json({caseId:existing.data.case_id,alreadyExisted:true});
+    const cell=problemCell(o.data.lon,o.data.lat);
+    const created=await db.from('cases').insert({area_id:areaId,category:o.data.type==='heat_stress'?'coral_concern':'satellite_optical_change',title:`Indikasi satelit · sel ${cell.code} · ${o.data.type==='heat_stress'?'panas karang':'perubahan optik'}`,status:'reviewing',recommendation_rule:'manual_review'}).select('id').single();
+    assertDb(created.error,'Buat kasus');
+    const evidence=await db.from('case_evidence').insert({case_id:created.data!.id,observation_id:o.data.id});
+    assertDb(evidence.error,'Bukti kasus');
+    await db.from('audit_events').insert({actor_id:user.id,entity_type:'case',entity_id:created.data!.id,action:'created_from_observation',metadata:{observation_id:o.data.id}});
+    return json({caseId:created.data!.id},201);
+  }
   if(path[0]==='review' && path[1]==='reports') {
     const areaId=await pilotAreaId();
     await reviewer(user,areaId);
@@ -152,13 +169,17 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
       const since=new Date(Date.now()-90*86400000).toISOString();
       const [r,o]=await Promise.all([
         db.from('reports').select(fields).eq('area_id',areaId).neq('status','pending_upload').gte('submitted_at',since).order('submitted_at',{ascending:false}).limit(300),
-        db.from('observations').select('id,type,lon,lat,observed_end,metrics').eq('state','published').gte('observed_end',new Date(Date.now()-60*86400000).toISOString()).limit(200),
+        db.from('observations').select('id,type,lon,lat,observed_start,observed_end,metrics,quality_flags,coverage_fraction').eq('state','published').gte('observed_end',new Date(Date.now()-60*86400000).toISOString()).limit(200),
       ]);
       const items=dataOrThrow(r.data,r.error,'Laporan')||[];
       const media=items.length?await db.from('report_media').select('report_id').in('report_id',items.map(x=>x.id)).eq('upload_status','complete'):{data:[],error:null};
       assertDb(media.error,'Foto');
       const photos=new Map<string,number>();for(const m of media.data||[])photos.set(m.report_id,(photos.get(m.report_id)||0)+1);
-      return json({items:items.map(x=>({...x,photoCount:photos.get(x.id)||0})),observations:dataOrThrow(o.data,o.error,'Observasi')||[]});
+      const observations=dataOrThrow(o.data,o.error,'Observasi')||[];
+      const links=observations.length?await db.from('case_evidence').select('observation_id,case_id,cases(status)').in('observation_id',observations.map(x=>x.id)):{data:[],error:null};
+      assertDb(links.error,'Kasus satelit');
+      const followUps=Object.fromEntries((links.data||[]).map(l=>[l.observation_id,{caseId:l.case_id,status:(l.cases as unknown as {status:string}|null)?.status||'new'}]));
+      return json({items:items.map(x=>({...x,photoCount:photos.get(x.id)||0})),observations,followUps});
     }
     const q=await db.from('reports').select('*').eq('id',path[2]).maybeSingle();
     assertDb(q.error,'Laporan');

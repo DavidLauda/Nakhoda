@@ -16,18 +16,25 @@ export function problemCell(lon:number,lat:number){
   return {key:`${x},${row}`,code:`${String.fromCharCode(65+x)}${row+1}`,west,east:west+PROBLEM_STEP,south:north-PROBLEM_STEP,north};
 }
 
-export type SatelliteObservation={id:string;type:string;lon:number;lat:number;observed_end:string;metrics:Record<string,unknown>|null};
+export type SatelliteObservation={id:string;type:string;lon:number;lat:number;observed_start?:string;observed_end:string;metrics:Record<string,unknown>|null;quality_flags?:unknown;coverage_fraction?:number|null};
 /** NOAA 7-day alert ≥2 (Warning) or Sentinel-2 candidate pixels count as an indication worth checking, never as proof of damage. */
-export function satelliteSignal(o:SatelliteObservation){
+export function satelliteSignal(o:SatelliteObservation):{indication:boolean;label:string;ignored?:string}{
   const m=o.metrics||{};
   if(o.type==='heat_stress'){
     const level=Number((m.alert_7day as {value?:unknown}|undefined)?.value);
     const names=['Tidak ada tekanan','Watch','Warning','Alert 1','Alert 2','Alert 3','Alert 4','Alert 5'];
     return {indication:Number.isFinite(level)&&level>=2,label:`Panas karang NOAA: ${Number.isFinite(level)?names[level]||`level ${level}`:'tidak diketahui'}`};
   }
-  const pixels=Number(m.candidate_pixel_count);
-  return {indication:Number.isFinite(pixels)&&pixels>0,label:Number.isFinite(pixels)&&pixels>0?`Perubahan optik Sentinel-2: ${pixels} piksel kandidat`:'Perubahan optik Sentinel-2: tidak ada kandidat'};
+  const pixels=Number(m.candidate_pixel_count),size=Number(m.pixel_size_m)||10;
+  const cloud=Math.max(Number(m.current_cloud_percent)||0,Number(m.baseline_cloud_percent)||0);
+  if(!Number.isFinite(pixels)||pixels<=0)return {indication:false,label:'Perubahan optik Sentinel-2: tidak ada kandidat'};
+  const area=`${(pixels*size*size/1e4).toLocaleString('id-ID',{maximumFractionDigits:1})} ha`;
+  // Thin cloud and its edges survive the SCL mask and read as "change"; such pairs are shown but not counted.
+  if(cloud>=OPTICAL_MAX_CLOUD)return {indication:false,ignored:`awan ${Math.round(cloud)}% pada salah satu citra`,label:`Perubahan optik Sentinel-2: ${area} berubah, tidak dihitung karena awan ${Math.round(cloud)}%`};
+  return {indication:true,label:`Perubahan optik Sentinel-2: ${area} berubah (${pixels} piksel)`};
 }
+/** Optical pairs with this much scene cloud are too likely to flag cloud edges as change. */
+export const OPTICAL_MAX_CLOUD=15;
 
 /** Problem = a verified report, two open reports, or a report backed by a satellite indication. Watch = one open report or a satellite indication alone. */
 export function cellLevel({open,verified,satellite}:{open:number;verified:number;satellite:boolean}):'problem'|'watch'|null{

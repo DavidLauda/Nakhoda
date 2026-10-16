@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { ExpressionSpecification, GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
 
-export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string;count?:number};
+export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string;count?:number;color?:string};
 export type MapAreaProperties={id:string;kind:'conservation'|'environment'|'problem';level?:'problem'|'watch';name:string;category?:'high'|'moderate'|'caution'|'avoid'|'unknown';zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number|string;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
 export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
@@ -25,7 +25,7 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
   // Callbacks change without rebuilding map.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[style]);
-  useEffect(()=>{if(!map.current)return;markers.current.forEach(x=>x.remove());markers.current=[];import('maplibre-gl').then(({default:maplibre})=>{if(!map.current)return;for(const pin of pins){const el=document.createElement('button');el.type='button';el.className=`map-pin ${pin.kind}${pin.count?' with-count':''}`;if(pin.count)el.textContent=String(pin.count);el.title=pin.label;el.setAttribute('aria-label',pin.label);el.onclick=e=>{e.stopPropagation();onSelect?.(pin);};markers.current.push(new maplibre.Marker({element:el}).setLngLat([pin.lon,pin.lat]).addTo(map.current));}});return()=>{markers.current.forEach(x=>x.remove());markers.current=[];};},[pins,onSelect,mapReady]);
+  useEffect(()=>{if(!map.current)return;markers.current.forEach(x=>x.remove());markers.current=[];import('maplibre-gl').then(({default:maplibre})=>{if(!map.current)return;for(const pin of pins){const el=document.createElement('button');el.type='button';el.className=`map-pin ${pin.kind}${pin.count?' with-count':''}`;if(pin.count)el.textContent=String(pin.count);if(pin.color)el.style.background=pin.color;el.title=pin.label;el.setAttribute('aria-label',pin.label);el.onclick=e=>{e.stopPropagation();onSelect?.(pin);};markers.current.push(new maplibre.Marker({element:el}).setLngLat([pin.lon,pin.lat]).addTo(map.current));}});return()=>{markers.current.forEach(x=>x.remove());markers.current=[];};},[pins,onSelect,mapReady]);
   useEffect(()=>{const m=map.current;if(!m)return;
     const install=()=>{
       if(!styleReady(m))return;
