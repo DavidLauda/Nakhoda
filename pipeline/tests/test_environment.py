@@ -37,3 +37,28 @@ def test_every_measured_cell_is_published_with_a_bounded_limit():
     assert (4,4) in positions
     with pytest.raises(RuntimeError,match='bounded publication limit'):
         publishable_positions(result['index'],len(positions)-1)
+
+
+def test_one_sided_gradient_recovers_observed_cells_without_filling_missing_inputs():
+    sst,chl,lats,lons=fields()
+    chl[4,5]=np.nan
+    strict=environmental_index(sst,chl,lats,lons)
+    adaptive=environmental_index(sst,chl,lats,lons,allow_one_sided=True)
+    assert np.isnan(strict['index'][4,4])
+    assert np.isfinite(adaptive['index'][4,4])
+    assert adaptive['one_sided'][4,4]
+    assert np.isnan(adaptive['index'][4,5])
+    assert not adaptive['one_sided'][2,2]
+    # No valid neighbour on either side of the east-west axis: no score.
+    chl[4,3]=np.nan
+    isolated=environmental_index(sst,chl,lats,lons,allow_one_sided=True)
+    assert np.isnan(isolated['index'][4,4])
+
+
+def test_one_sided_gradient_never_crosses_restricted_or_land_cells():
+    sst,chl,lats,lons=fields()
+    water=np.ones(sst.shape,dtype=bool)
+    water[4,3]=False;water[4,5]=False
+    result=environmental_index(sst,chl,lats,lons,marine_mask=water,allow_one_sided=True)
+    assert np.isnan(result['index'][4,4])
+    assert np.isnan(result['index'][4,3])

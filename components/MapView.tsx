@@ -4,7 +4,7 @@ import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapLayerMouseEvent, Marker, StyleSpecification } from 'maplibre-gl';
 
 export type MapPin={id:string;lon:number;lat:number;kind:'observation'|'presence'|'cell'|'report';label:string};
-export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number};
+export type MapAreaProperties={id:string;kind:'conservation'|'environment';name:string;zoneType?:string;score?:number;priority?:boolean;observedEnd?:string;sourceFeatureId?:number;coverage?:'measured'|'estimate'|'unknown';sourceCellId?:string;sourceResolution?:string;lon?:number;lat?:number};
 export type MapAreas=FeatureCollection<Polygon|MultiPolygon,MapAreaProperties>;
 const defaultStyle:StyleSpecification={version:8,sources:{osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors'}},layers:[{id:'osm',type:'raster',source:'osm'}]};
 const emptyAreas:MapAreas={type:'FeatureCollection',features:[]};
@@ -23,18 +23,21 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
     const install=()=>{
       const source=m.getSource('area-overlays') as GeoJSONSource|undefined;
       if(source)source.setData(areas);else m.addSource('area-overlays',{type:'geojson',data:areas});
-      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','priority'],true],'#14876b','#8fd0b4'],'fill-opacity':0.6}});
-      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':'#0e5c3b','line-width':1.5,'line-opacity':0.8}});
+      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':['case',['==',['get','coverage'],'unknown'],'#cbd5e1',['==',['get','coverage'],'estimate'],'#66a9cf',['==',['get','priority'],true],'#14876b','#8fd0b4'],'fill-opacity':0.6}});
+      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':['match',['get','coverage'],'unknown','#94a3b8','estimate','#397b9c','#0e5c3b'],'line-width':1,'line-opacity':0.7}});
       if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':['match',['get','zoneType'],'Inti','#c8553d','Perlindungan Bahari','#8a5a9e','Pemanfaatan','#f0c24b','#c8553d'],'fill-opacity':0.65}});
       if(!m.getLayer('environment-selected'))m.addLayer({id:'environment-selected',type:'line',source:'area-overlays',filter:['==',['get','id'],selectedRef.current??''],paint:{'line-color':'#0b2a3c','line-width':3.5}});
       if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':'#0b2a3c','line-width':2,'line-opacity':0.9}});
     };
-    if(m.isStyleLoaded())install();else m.once('load',install);
+    // "load" fires only once. Later GeoJSON updates can arrive while raster
+    // tiles are loading, when isStyleLoaded() is false even though the source exists.
+    const installWhenReady=()=>{m.off('load',installWhenReady);m.off('idle',installWhenReady);install();};
+    if(m.getSource('area-overlays')||m.isStyleLoaded())install();else{m.once('load',installWhenReady);m.once('idle',installWhenReady);}
     const selectConservation=(e:MapLayerMouseEvent)=>{const p=e.features?.[0]?.properties as MapAreaProperties|undefined;if(p)onAreaSelect?.(p);};
     const selectEnvironment=(e:MapLayerMouseEvent)=>{if(m.queryRenderedFeatures(e.point,{layers:['conservation-fill']}).length)return;const p=e.features?.[0]?.properties as MapAreaProperties|undefined;if(p)onAreaSelect?.(p);};
     m.on('click','conservation-fill',selectConservation);
     m.on('click','environment-fill',selectEnvironment);
-    return()=>{m.off('load',install);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);};
+    return()=>{m.off('load',installWhenReady);m.off('idle',installWhenReady);m.off('click','conservation-fill',selectConservation);m.off('click','environment-fill',selectEnvironment);};
   },[areas,onAreaSelect,mapReady]);
   const selectedRef=useRef(selectedId);
   useEffect(()=>{selectedRef.current=selectedId;const m=map.current;if(m?.getLayer('environment-selected'))m.setFilter('environment-selected',['==',['get','id'],selectedId??'']);},[selectedId,mapReady]);

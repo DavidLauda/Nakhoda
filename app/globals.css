@@ -189,7 +189,11 @@ details summary{cursor:pointer;font-weight:600;color:var(--teal)}
 .fisher-map-wrap{position:relative;min-height:0}
 .fisher-app .fisher-map{height:100%}
 .map-legend.floating{position:absolute;top:12px;left:12px;z-index:2;margin:0;padding:6px 12px;gap:4px 12px;font-size:.75rem;max-width:calc(100% - 64px);box-shadow:0 2px 8px rgba(11,42,60,.18)}
-.legend-area.zone-area{background:linear-gradient(90deg,var(--red) 0 34%,#8a5a9e 34% 67%,var(--amber) 67%)}
+.legend-area.zone-core{background:#c8553d}
+.legend-area.zone-protection{background:#8a5a9e}
+.legend-area.zone-use{background:#f0c24b}
+.legend-area.estimate-area{background:#66a9cf}
+.legend-area.no-data-area{background:#cbd5e1;border:1px solid #94a3b8}
 .fisher-sheet{background:#fff;border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;min-height:0}
 .fisher-sheet>*,.sheet-zone>*{margin:0;flex-shrink:0}
 .sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}

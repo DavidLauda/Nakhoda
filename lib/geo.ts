@@ -26,10 +26,39 @@ export function pointInArea(lon:number,lat:number,geometry:AreaGeometry) {
 export function zoneAt<F extends ZoneFeature>(lon:number,lat:number,features:F[]):F|undefined {
   return features.find(f=>pointInArea(lon,lat,f.geometry));
 }
-/** Approximate: samples the centre, corners and edge midpoints of a square cell. */
+function segmentTouchesBox(a:number[],b:number[],west:number,south:number,east:number,north:number) {
+  let near=0,far=1;
+  const dx=b[0]-a[0],dy=b[1]-a[1];
+  for(const [p,q] of [[-dx,a[0]-west],[dx,east-a[0]],[-dy,a[1]-south],[dy,north-a[1]]]) {
+    if(p===0){if(q<0)return false;continue;}
+    const t=q/p;
+    if(p<0)near=Math.max(near,t);else far=Math.min(far,t);
+    if(near>far)return false;
+  }
+  return true;
+}
+/** Any contact counts, including a narrow polygon crossing a cell between sample points. */
+export function cellIntersectsArea(cell:LonLat,half:number,geometry:AreaGeometry) {
+  const west=cell.lon-half,east=cell.lon+half,south=cell.lat-half,north=cell.lat+half;
+  const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.coordinates;
+  return polygons.some(([outer])=>{
+    if(!outer?.length)return false;
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const [x,y] of outer){minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
+    if(maxX<west||minX>east||maxY<south||minY>north)return false;
+    for(const [x,y] of [[west,south],[east,south],[west,north],[east,north]])if(pointInArea(x,y,geometry))return true;
+    for(let i=0;i<outer.length;i++){
+      const a=outer[i],b=outer[(i+1)%outer.length];
+      if(a[0]>=west&&a[0]<=east&&a[1]>=south&&a[1]<=north)return true;
+      if(segmentTouchesBox(a,b,west,south,east,north))return true;
+    }
+    return false;
+  });
+}
+/** Return every intersecting zone so the most restrictive one can win. */
 export function cellZoneTypes(cell:LonLat,half:number,features:ZoneFeature[]) {
   const types=new Set<string>();
-  for(const dx of [-half,0,half])for(const dy of [-half,0,half]){const z=zoneAt(cell.lon+dx,cell.lat+dy,features);if(z?.properties.zoneType)types.add(z.properties.zoneType);}
+  for(const feature of features)if(feature.properties.zoneType&&cellIntersectsArea(cell,half,feature.geometry))types.add(feature.properties.zoneType);
   return types;
 }
 const rad=(d:number)=>d*Math.PI/180;

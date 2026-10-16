@@ -11,7 +11,7 @@ import xarray as xr
 from pipeline.analysis.environment import environmental_index
 
 
-VERSION = 'environment-index-highres-v0.1'
+VERSION = 'environment-index-highres-v0.2'
 RESOLUTION_DEGREES = 0.01
 MIN_CHL_PIXELS = 2
 MAX_CHL_UNCERTAINTY_PERCENT = 60
@@ -82,7 +82,7 @@ def paired_index(chl: dict, sst: dict, bbox: list[float]) -> dict:
     latitudes = (lat_edges[:-1] + lat_edges[1:]) / 2
     longitudes = (lon_edges[:-1] + lon_edges[1:]) / 2
     result = environmental_index(sst['values'], chl['values'], latitudes, longitudes,
-                                 marine_mask=chl['water'], min_cells=20)
+                                 marine_mask=chl['water'], min_cells=20, allow_one_sided=True)
     return {**result, 'latitudes': latitudes, 'longitudes': longitudes,
             'sst_c': sst['values'], 'chl_mg_m3': chl['values'],
             'resolution_degrees': RESOLUTION_DEGREES,

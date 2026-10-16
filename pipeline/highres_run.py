@@ -108,7 +108,7 @@ def _cells(result: dict, scene_name: str, area_id: str | None) -> list[dict]:
             'index_score': int(result['index'][y, x]),
             'algorithm_version': VERSION,
             'resolution': '0.01 degree (~1.1 km)',
-            'quality_flags': flags,
+            'quality_flags': flags + (['sst_gradient_one_sided'] if result['one_sided'][y, x] else []),
             'exclusion': None, 'zoning_verified': False,
         })
     return rows
@@ -184,6 +184,7 @@ def main() -> None:
         'sst_start': result['sst_start'], 'sst_end': result['sst_end'],
         'sst_day_fraction': result['sst_day_fraction'],
         'paired_cells': result['paired_cells'], 'eligible_cells': result['eligible_cells'],
+        'one_sided_cells': int(np.count_nonzero(result['one_sided'] & np.isfinite(result['index']))),
         'quality_flags': rows[0]['quality_flags'] if rows else [],
         'cells': [{k: v for k, v in row.items() if k != 'area_id'} for row in rows],
     }
