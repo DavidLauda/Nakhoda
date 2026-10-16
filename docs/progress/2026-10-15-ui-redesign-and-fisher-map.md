@@ -30,6 +30,19 @@ The UI was restyled after the "NAKHODA Mockup Peran" design (fisher: mobile-firs
 - **Distance and direction:** with GPS on, the sheet shows "X km · arah … dari posisi Anda". A "Terdekat yang bagus" button jumps to the nearest cell in the top 20% of recommended cells (minimum 3).
 - **Selected cell highlight:** `MapView` accepts `selectedId` (navy outline layer `environment-selected`) and `focus` (eases to the cell when picked from the sheet).
 
+### 4. Map crash fix (16 Oct)
+- Symptom: in Safari the app crashed with `null is not an object (evaluating 'this.style.getLayer')` ("Application error: a client-side exception"). Chrome usually did not show it.
+- Cause: MapLibre sets `map.style` to `null` while a WebGL context is lost (more frequent in Safari under GPU memory pressure or after the tab is backgrounded) and rebuilds it on restore. The new selected-cell effect called `getLayer`/`setFilter` without checking that a style exists.
+- Fix in `components/MapView.tsx`: every style access goes through `styleReady()` (style present and loaded); overlay installation is idempotent and re-runs on `styledata` and `idle`, so sources, layers, and the selected-cell filter come back after a context restore; the click handler skips work without a style; the pin effect uses the live map instead of a captured instance.
+- Checked by forcing `WEBGL_lose_context` in the browser, changing the selection while the context was lost, then restoring: no crash, layers restored, and the highlight moved to the newly selected cell.
+
+### 5. South Kepulauan Seribu zones from KKP Decision 28/2026 (16 Oct, data only)
+- Downloaded the decree PDF from JDIH KKP (`https://jdih.kkp.go.id/peraturan/2026kepmenkp028.pdf`, 23 pages). Lampiran I lists 191 numbered boundary points (DMS, WGS 84) for 12 areas around Damar Kecil, Rambut, Bokor, Pari, Payung, Tidung Kecil, Tidung Besar, Karang Beras, and Air; Lampiran II has the maps.
+- `scripts/generate_kepmen_28_2026_zones.py` turns the extracted text into `public/conservation-south-kkp-2026.geojson`: 12 area boundaries (labelled `Pemanfaatan Terbatas`) and 8 core-zone polygons (`Inti`), each with `computedHa` and the decree's `statedHa`.
+- Checks: core zones match the decree exactly where it states a single figure (Pari 4.47, Payung 3.54, Tidung Besar 5.12, Karang Beras 2.88 ha); Rambut cores sum to 26.14 vs 26.19 ha; Pari IV+V 21.53 vs 21.50 ha; Payung VI+VII 451.81 vs 451.50 ha with core points included. Area boundaries around islands come out larger than stated because the decree counts water only.
+- Source inconsistencies: Area III (Bokor) points do not trace the ellipse drawn in Lampiran II (168.7 vs 206.3 ha), so that feature carries a `note`; the "Zona Lain" tables (marine installations, ship lane, harbour) reuse point numbers with shifted latitudes and are not included.
+- Not yet shown on the map. The current map colour expression maps unknown zone types to red, so `Pemanfaatan Terbatas` needs its own colour when the layer is wired in.
+
 ## Verification
 - `npm test`: 5 tests pass, including 3 new geo tests (holes, multipolygons, cell overlap, distance, compass).
 - `npm run typecheck` passes; `npm run lint` reports the same 4 pre-existing warnings; `npm run build` passes.
