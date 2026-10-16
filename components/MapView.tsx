@@ -32,11 +32,11 @@ export function MapView({pins,areas=emptyAreas,onPick,onSelect,onAreaSelect,user
       const source=m.getSource('area-overlays') as GeoJSONSource|undefined;
       if(!source)m.addSource('area-overlays',{type:'geojson',data:areas});else if(appliedAreas.current!==areas)source.setData(areas);
       appliedAreas.current=areas;
-      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':areaFillColor,'fill-opacity':0.65}});
-      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.7}});
-      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':areaFillColor,'fill-opacity':0.65}});
+      if(!m.getLayer('environment-fill'))m.addLayer({id:'environment-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'fill-color':areaFillColor,'fill-opacity':0.35}});
+      if(!m.getLayer('environment-outline'))m.addLayer({id:'environment-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'environment'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.4}});
+      if(!m.getLayer('conservation-fill'))m.addLayer({id:'conservation-fill',type:'fill',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'fill-color':areaFillColor,'fill-opacity':0.35}});
       if(!m.getLayer('environment-selected'))m.addLayer({id:'environment-selected',type:'line',source:'area-overlays',filter:selectedFilter(selectedRef.current),paint:{'line-color':'#0b2a3c','line-width':3.5}});
-      if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.7}});
+      if(!m.getLayer('conservation-outline'))m.addLayer({id:'conservation-outline',type:'line',source:'area-overlays',filter:['==',['get','kind'],'conservation'],paint:{'line-color':areaOutlineColor,'line-width':areaOutlineWidth,'line-opacity':0.4}});
       applySelected(m,selectedRef.current);
     };
     // Re-runs when a style (re)loads or the map settles, including after context restoration; install is idempotent.
