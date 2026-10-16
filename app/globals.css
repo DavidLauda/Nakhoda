@@ -16,7 +16,8 @@ p{margin:.5rem 0 1rem}
 small{color:var(--muted)}
 .eyebrow{font-size:.75rem;letter-spacing:.08em;font-weight:700;color:var(--teal);margin:0}
 .brand{font-family:var(--display);font-size:1.4rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--ink);display:inline-flex;align-items:center;gap:8px}
-.brand-mark{display:inline-flex;color:var(--teal)}
+.brand-mark{display:inline-flex;align-items:center;flex-shrink:0}
+.brand-mark img{display:block;object-fit:contain}
 .brand.large{font-size:1.9rem}
 .pwa-install{margin:16px 0;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--white);text-align:left}
 .pwa-install-heading{display:flex;align-items:center;gap:12px;margin-bottom:12px}
@@ -29,7 +30,6 @@ small{color:var(--muted)}
 .app-shell{display:flex;min-height:100vh}
 .sidebar{width:248px;flex:0 0 248px;background:var(--navy);color:var(--white);padding:24px 16px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .sidebar .brand{color:var(--white)}
-.sidebar .brand-mark{color:var(--amber)}
 .sidebar-sub{color:var(--on-navy-muted);font-size:.82rem;font-weight:600;margin:8px 0 0}
 .sidebar nav{display:grid;gap:4px;margin-top:28px}
 .sidebar nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;text-decoration:none;color:var(--on-navy);font-weight:600;border-radius:10px}
@@ -171,7 +171,7 @@ details summary{cursor:pointer;font-weight:600;color:var(--teal)}
 }
 @media(max-width:650px){.sidebar{display:none}
 .topbar{background:var(--navy);border-bottom:0;color:var(--white);padding:0 16px;position:sticky;top:0;z-index:50}
-.mobile-brand{display:block}
+.mobile-brand{display:inline-flex;align-items:center;gap:8px}
 .topbar>span:nth-child(2){display:none}
 .online-indicator{color:var(--white)}
 .page{padding:20px 16px 92px}
