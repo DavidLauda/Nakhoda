@@ -49,11 +49,36 @@ async function dispatch(request:NextRequest,method:string,path:string[]):Promise
   }
   if(path[0]==='environment-cells' && method==='GET') {
     const b=bbox(request.nextUrl.searchParams.get('bbox'));
-    const q=await db.from('environment_cells').select('id,lon,lat,observed_start,observed_end,source_asset_ids,sst_c,chlorophyll_mg_m3,front_rank,chlorophyll_component,index_score,algorithm_version,resolution,quality_flags,exclusion,zoning_verified,published_at').order('observed_end',{ascending:false}).order('published_at',{ascending:false}).limit(500);
-    const rows=dataOrThrow(q.data,q.error,'Sel lingkungan')||[];
-    const latest=rows[0];
-    const items=rows.filter(x=>latest && x.observed_end===latest.observed_end && x.algorithm_version===latest.algorithm_version && JSON.stringify(x.source_asset_ids)===JSON.stringify(latest.source_asset_ids) && inBbox(x.lon,x.lat,b)).map(x=>({...x,currentScore:!x.exclusion && x.index_score!==null && Date.now()-Date.parse(x.observed_end)<=7*86400000 ? x.index_score:null,legalNote:x.zoning_verified?null:'Aturan penangkapan di lokasi ini belum diverifikasi'}));
-    return json({items,unavailableReason:items.length?'': 'Skor belum tersedia: SST dan klorofil-a yang cocok belum diproses.'});
+    const columns='id,lon,lat,observed_start,observed_end,source_asset_ids,sst_c,chlorophyll_mg_m3,front_rank,chlorophyll_component,index_score,algorithm_version,resolution,quality_flags,exclusion,zoning_verified,published_at';
+    const [completed,coarse]=await Promise.all([
+      db.from('analysis_runs').select('counts').eq('source_name','Copernicus Marine + CDSE Sentinel-3').eq('status','success').order('latest_published_result_at',{ascending:false}).limit(1),
+      db.from('environment_cells').select(columns).neq('algorithm_version','environment-index-highres-v0.1').order('observed_end',{ascending:false}).order('published_at',{ascending:false}).limit(1),
+    ]);
+    assertDb(completed.error,'Publikasi sel detail');assertDb(coarse.error,'Sel lingkungan');
+    const manifest=completed.data?.[0]?.counts as {observed_end?:string;algorithm_version?:string;source_asset_ids?:string[]}|undefined;
+    const highres=manifest?.observed_end && manifest.algorithm_version==='environment-index-highres-v0.1' && Array.isArray(manifest.source_asset_ids)
+      ? await db.from('environment_cells').select(columns).eq('observed_end',manifest.observed_end).eq('algorithm_version',manifest.algorithm_version).contains('source_asset_ids',manifest.source_asset_ids).limit(1)
+      : null;
+    if(highres) assertDb(highres.error,'Sel detail');
+    const fine=highres?.data?.[0];
+    const fineAge=fine?Date.now()-Date.parse(fine.observed_end):Infinity;
+    const latest=fine && fineAge>=0 && fineAge<=7*86400000 ? fine : (coarse.data?.[0]??fine);
+    if(!latest) return json({items:[],unavailableReason:'Skor belum tersedia: SST dan klorofil-a yang cocok belum diproses.'});
+    type EnvironmentRow=typeof latest;
+    const rows:EnvironmentRow[]=[];
+    for(let offset=0;offset<6000;offset+=1000){
+      const q=await db.from('environment_cells').select(columns)
+        .eq('observed_end',latest.observed_end).eq('algorithm_version',latest.algorithm_version)
+        .contains('source_asset_ids',latest.source_asset_ids)
+        .gte('lon',b[0]).lte('lon',b[2]).gte('lat',b[1]).lte('lat',b[3])
+        .order('id',{ascending:true}).range(offset,offset+999);
+      const page=dataOrThrow(q.data,q.error,'Sel lingkungan')||[];
+      rows.push(...page.filter(x=>JSON.stringify(x.source_asset_ids)===JSON.stringify(latest.source_asset_ids)));
+      if(page.length<1000) break;
+      if(offset===5000) throw new ApiError(503,'too_many_cells','Jumlah sel melebihi batas tampilan pilot.');
+    }
+    const items=rows.map(x=>({...x,currentScore:!x.exclusion && x.index_score!==null && Date.now()-Date.parse(x.observed_end)<=7*86400000 ? x.index_score:null,legalNote:x.zoning_verified?null:'Aturan penangkapan di lokasi ini belum diverifikasi'}));
+    return json({items,unavailableReason:items.length?'': 'Skor belum tersedia di area ini.'});
   }
   if(path.join('/')==='data-health' && method==='GET') {
     const q=await db.from('analysis_runs').select('id,source_name,status,latest_check_at,latest_usable_observation_at,error_code').order('started_at',{ascending:false}).limit(30);

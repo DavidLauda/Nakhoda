@@ -15,7 +15,7 @@ export function FisherPortal(){
   const [cells,setCells]=useState<Cell[]>([]),[selected,setSelected]=useState<string|null>(null),[selectedZone,setSelectedZone]=useState<MapAreaProperties|null>(null),[conservation,setConservation]=useState<MapAreas>({type:'FeatureCollection',features:[]}),[zoneError,setZoneError]=useState(''),[error,setError]=useState(''),[location,setLocation]=useState<Position|null>(null),[gpsError,setGpsError]=useState(''),[tracking,setTracking]=useState(false),[focus,setFocus]=useState<{lon:number;lat:number}|null>(null);
   const watch=useRef<number|null>(null);
   const load=useCallback(()=>api('environment-cells').then(x=>{setCells(x.items||[]);setError('');}).catch(e=>setError((e as Error).message)),[]);
-  useEffect(()=>{load();const id=window.setInterval(load,60000);return()=>window.clearInterval(id);},[load]);
+  useEffect(()=>{load();const id=window.setInterval(load,300000);return()=>window.clearInterval(id);},[load]);
   useEffect(()=>{let alive=true;fetch('/conservation-north-big.geojson').then(r=>{if(!r.ok)throw new Error('Lapisan zonasi gagal dimuat.');return r.json();}).then(x=>{if(!x||x.type!=='FeatureCollection'||!Array.isArray(x.features))throw new Error('Format lapisan zonasi tidak sesuai.');if(alive){setConservation(x as MapAreas);setZoneError('');}}).catch(e=>{if(alive)setZoneError((e as Error).message);});return()=>{alive=false;};},[]);
   useEffect(()=>()=>{if(watch.current!==null)navigator.geolocation.clearWatch(watch.current);},[]);
   function startGps(){if(!navigator.geolocation){setGpsError('GPS tidak tersedia di browser ini.');return;}setGpsError('');setTracking(true);watch.current=navigator.geolocation.watchPosition(p=>{setLocation({lon:p.coords.longitude,lat:p.coords.latitude,accuracy:p.coords.accuracy,at:p.timestamp});setGpsError('');},e=>{setGpsError(e.message);setTracking(false);setLocation(null);if(watch.current!==null)navigator.geolocation.clearWatch(watch.current);watch.current=null;},{enableHighAccuracy:true,maximumAge:15000,timeout:20000});}
@@ -39,7 +39,7 @@ export function FisherPortal(){
   return <section className="fisher-app">
     <div className="fisher-map-wrap">
       <div className="map-frame fisher-map"><MapView pins={noPins} areas={areas} userLocation={location} onAreaSelect={selectArea} selectedId={selectedZone?undefined:active?.id} focus={focus}/></div>
-      <div className="map-legend floating" aria-label="Legenda peta"><span><i className="legend-area priority-area"/>Tertinggi</span><span><i className="legend-area measured-area"/>Terukur</span><span><i className="legend-area zone-area"/>Konservasi</span>{location&&<span><i className="legend-dot gps-dot"/>Saya</span>}</div>
+      <div className="map-legend floating" aria-label="Legenda peta"><span><i className="legend-area priority-area"/>Skor Tinggi</span><span><i className="legend-area measured-area"/>Skor Sedang</span><span><i className="legend-area zone-area"/>Konservasi</span>{location&&<span><i className="legend-dot gps-dot"/>Saya</span>}</div>
     </div>
     <div className="fisher-sheet">
       {error&&<p className="error" role="alert">{error}</p>}

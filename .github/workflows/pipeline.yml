@@ -7,7 +7,7 @@ on:
       source:
         description: Source to run
         type: choice
-        options: [all, noaa, marine, sentinel]
+        options: [all, noaa, marine, marine-highres, sentinel]
         default: all
 permissions:
   contents: read
@@ -33,10 +33,17 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CDSE_CLIENT_ID: ${{ secrets.CDSE_CLIENT_ID }}
           CDSE_CLIENT_SECRET: ${{ secrets.CDSE_CLIENT_SECRET }}
+          CDSE_USERNAME: ${{ secrets.CDSE_USERNAME }}
+          CDSE_PASSWORD: ${{ secrets.CDSE_PASSWORD }}
           COPERNICUSMARINE_SERVICE_USERNAME: ${{ secrets.COPERNICUSMARINE_SERVICE_USERNAME }}
           COPERNICUSMARINE_SERVICE_PASSWORD: ${{ secrets.COPERNICUSMARINE_SERVICE_PASSWORD }}
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: python -m pipeline.run --source '${{ inputs.source || 'all' }}'
+        run: |
+          if [ '${{ inputs.source || 'all' }}' = 'marine-highres' ]; then
+            python -m pipeline.highres_run --publish
+          else
+            python -m pipeline.run --source '${{ inputs.source || 'all' }}'
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
