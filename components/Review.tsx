@@ -1,4 +1,5 @@
 'use client';
+import { LoadingIndicator } from './LoadingIndicator';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/client';
 import { caseDestination } from '@/lib/case-review';
@@ -9,9 +10,9 @@ const dt=(x?:string)=>x?new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta'
 export function LegacyCaseRedirect({id}:{id:string}){
   const [error,setError]=useState('');
   useEffect(()=>{api(`cases/${id}`).then(data=>window.location.replace(caseDestination(data.evidence||[]))).catch(e=>setError((e as Error).message));},[id]);
-  return <section className="page"><p role="status">{error||'Membuka halaman peninjauan…'}</p><a href="/government/reports">Kembali ke laporan masuk</a></section>;
+  return <section className="page">{error?<p className="error" role="alert">{error}</p>:<LoadingIndicator label="Membuka halaman peninjauan…"/>}<a href="/government/reports">Kembali ke laporan masuk</a></section>;
 }
-export function DataHealth(){const [runs,setRuns]=useState<Array<Record<string,any>>>([]),[message,setMessage]=useState('');useEffect(()=>{api('data-health').then(x=>{setRuns(x.runs||x.sources||[]);setMessage(x.message||'');}).catch(e=>setMessage(e.message));},[]);return <section className="page"><p className="eyebrow">PROVENANS SUMBER</p><h1>Kesehatan data</h1><p>Waktu pemeriksaan dan waktu pengamatan berbeda. Jadwal GitHub Actions dapat terlambat atau terlewat.</p>{message&&<div className="empty">{message}</div>}{runs.map((r,i)=><div className="data-card" key={r.id||i}><strong>{r.source_name}</strong><span>Status: {r.status}</span><small>Diperiksa {dt(r.latest_check_at)} · Pengamatan layak terbaru {dt(r.latest_usable_observation_at)}</small>{r.error_code&&<small>Kesalahan: {r.error_code}</small>}</div>)}</section>;}
+export function DataHealth(){const [runs,setRuns]=useState<Array<Record<string,any>>>([]),[message,setMessage]=useState(''),[loading,setLoading]=useState(true);useEffect(()=>{api('data-health').then(x=>{setRuns(x.runs||x.sources||[]);setMessage(x.message||'');}).catch(e=>setMessage(e.message)).finally(()=>setLoading(false));},[]);return <section className="page"><p className="eyebrow">PROVENANS SUMBER</p><h1>Kesehatan data</h1><p>Waktu pemeriksaan dan waktu pengamatan berbeda. Jadwal GitHub Actions dapat terlambat atau terlewat.</p>{loading&&<LoadingIndicator label="Memuat kesehatan data…"/>}{message&&<div className="empty">{message}</div>}{runs.map((r,i)=><div className="data-card" key={r.id||i}><strong>{r.source_name}</strong><span>Status: {r.status}</span><small>Diperiksa {dt(r.latest_check_at)} · Pengamatan layak terbaru {dt(r.latest_usable_observation_at)}</small>{r.error_code&&<small>Kesalahan: {r.error_code}</small>}</div>)}</section>;}
 export function AdminPanel({user}:{user:AppUser}){
   const [userId,setUserId]=useState(''),[role,setRole]=useState('reviewer'),[message,setMessage]=useState('');
   if(user.role!=='admin')return <section className="page"><h1>Akses ditolak</h1></section>;

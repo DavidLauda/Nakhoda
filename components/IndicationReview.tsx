@@ -1,4 +1,5 @@
 'use client';
+import { LoadingIndicator } from './LoadingIndicator';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { api } from '@/lib/client';
 import { CASE_PRIORITIES, CASE_STATES, CASE_STATUS, type CaseAudit, type CaseReview } from '@/lib/case-review';
@@ -38,7 +39,7 @@ export function IndicationReview({id,onSaved}:{id:string;onSaved:(item:CaseRevie
       setAudit(history.audit);
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
-  if(loading)return <div className="panel"><p role="status">Memuat penilaian…</p></div>;
+  if(loading)return <div className="panel"><LoadingIndicator compact label="Memuat penilaian…"/></div>;
   return <>
     <form className="panel action-panel indication-review" onSubmit={save}>
       <h2>Penilaian indikasi</h2>

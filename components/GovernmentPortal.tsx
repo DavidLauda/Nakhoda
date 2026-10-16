@@ -1,4 +1,5 @@
 'use client';
+import { LoadingIndicator } from './LoadingIndicator';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/client';
 import { satelliteSignal } from '@/lib/review';
@@ -41,7 +42,7 @@ export function GovernmentPortal(){
   ];
   return <section className="page government-page">
     <div className="page-heading"><div><h1>Peta masalah wilayah</h1><p>Area pilot · laporan nelayan dicocokkan dengan indikasi satelit</p></div><ReportFilters {...{category,setCategory,status,setStatus}}/></div>
-    {loading&&<p role="status">Memuat laporan dan observasi…</p>}{error&&<AccessError message={error}/>}
+    {loading&&<LoadingIndicator label="Memuat laporan dan observasi…"/>}{error&&<AccessError message={error}/>}
     <div className="stats-row govt-stats">{stats.map(s=><div key={s.label}><strong>{s.value}</strong><span>{s.label}</span><small>{s.note}</small></div>)}</div>
     <div className="problem-layout">
       <div className="panel problem-map-panel">

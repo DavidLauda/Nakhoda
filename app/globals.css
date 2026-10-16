@@ -18,6 +18,13 @@ small{color:var(--muted)}
 .brand{font-family:var(--display);font-size:1.4rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--ink);display:inline-flex;align-items:center;gap:8px}
 .brand-mark{display:inline-flex;align-items:center;flex-shrink:0}
 .brand-mark img{display:block;object-fit:contain}
+.app-loading-screen{min-height:100vh;min-height:100svh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--navy)}
+.nakhoda-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:180px;padding:24px;text-align:center;color:var(--muted);font-size:.9rem;font-weight:600}
+.nakhoda-loading.light{color:var(--on-navy)}
+.nakhoda-loading.compact{min-height:100px;padding:12px;gap:10px;font-size:.82rem}
+.nakhoda-loading-logo{display:block;flex-shrink:0;object-fit:contain;animation:nakhoda-loading-spin 1.8s linear infinite}
+@keyframes nakhoda-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.nakhoda-loading-logo{animation:none}}
 .brand.large{font-size:1.9rem}
 .pwa-install{margin:16px 0;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--white);text-align:left}
 .pwa-install-heading{display:flex;align-items:center;gap:12px;margin-bottom:12px}

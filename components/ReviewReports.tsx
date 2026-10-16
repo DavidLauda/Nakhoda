@@ -1,4 +1,5 @@
 'use client';
+import { LoadingIndicator } from './LoadingIndicator';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/client';
 import { OPEN_STATUSES, REPORT_CATEGORIES, REPORT_STATUS, cellLevel, confidence, problemCell, satelliteSignal, type ReviewAction, type SatelliteObservation } from '@/lib/review';
@@ -59,7 +60,7 @@ export function ReviewReportList(){
   const {items,cells,indications,error,loading}=useReviewData(),[category,setCategory]=useState(''),[status,setStatus]=useState('open');
   const shown=filterReports(items,category,status),shownIndications=filterIndications(indications,category,status);
   return <section className="page review-page"><div className="page-heading"><div><h1>Laporan masuk</h1><p>Laporan nelayan 90 hari terakhir dan indikasi satelit 60 hari terakhir. Identitas pelapor tidak ditampilkan.</p></div><ReportFilters {...{category,setCategory,status,setStatus}}/></div>
-    {loading&&<p role="status">Memuat laporan…</p>}{error&&<AccessError message={error}/>}
+    {loading&&<LoadingIndicator label="Memuat laporan…"/>}{error&&<AccessError message={error}/>}
     {!loading&&!error&&<ReportCards items={shown} cells={cells} indications={shownIndications}/>}
   </section>;
 }
@@ -72,8 +73,8 @@ type Detail={item:ReviewReport;cell:ReturnType<typeof problemCell>;media:{id:str
 const STANCE:Record<string,string>={similar:'Nelayan melihat kondisi serupa dengan observasi satelit',not_observed:'Nelayan tidak melihat kondisi pada observasi satelit',cannot_assess:'Nelayan tidak dapat menilai observasi satelit'};
 
 export function ReviewReportDetail({id}:{id:string}){
-  const [data,setData]=useState<Detail|null>(null),[photos,setPhotos]=useState<string[]>([]),[error,setError]=useState(''),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
-  const load=useCallback(()=>api(`review/reports/${id}`).then(async(x:Detail)=>{setData(x);setError('');setPhotos((await Promise.all(x.media.map(m=>api(`reports/${id}/media/${m.id}`).then(r=>r.url as string).catch(()=>'')))).filter(Boolean));}).catch(e=>setError((e as Error).message)),[id]);
+  const [data,setData]=useState<Detail|null>(null),[photos,setPhotos]=useState<string[]>([]),[photosLoading,setPhotosLoading]=useState(true),[error,setError]=useState(''),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
+  const load=useCallback(()=>{setPhotosLoading(true);return api(`review/reports/${id}`).then(async(x:Detail)=>{setData(x);setError('');setPhotos((await Promise.all(x.media.map(m=>api(`reports/${id}/media/${m.id}`).then(r=>r.url as string).catch(()=>'')))).filter(Boolean));}).catch(e=>setError((e as Error).message)).finally(()=>setPhotosLoading(false));},[id]);
   useEffect(()=>{load();},[load]);
   async function act(status:ReviewAction){
     if(!data)return;
@@ -83,7 +84,7 @@ export function ReviewReportDetail({id}:{id:string}){
     catch(e){setMessage((e as Error).message);}finally{setBusy(false);}
   }
   if(error)return <section className="page review-page"><a href="/government/reports">← Laporan masuk</a><AccessError message={error}/></section>;
-  if(!data)return <section className="page review-page"><p role="status">Memuat laporan…</p></section>;
+  if(!data)return <section className="page review-page"><LoadingIndicator label="Memuat laporan…"/></section>;
   const r=data.item,signals=data.observations.map(o=>({o,...satelliteSignal(o)})),indicated=signals.some(s=>s.indication);
   const others=data.sameCell.filter(x=>!['unsubstantiated','duplicate','closed'].includes(x.status));
   const conf=confidence({photo:data.media.length>0,neighbours:others.length,satellite:indicated});
@@ -95,7 +96,7 @@ export function ReviewReportDetail({id}:{id:string}){
     <div className="review-detail">
       <div className="review-main">
         <div className="panel report-body">
-          <div className="report-photos">{photos.length?photos.map((u,i)=><img key={u} src={u} alt={`Foto laporan ${i+1}`}/>):<div className="photo-placeholder">{data.media.length?'Memuat foto…':'Tanpa foto'}{r.text_only_reason&&<small>Alasan: {r.text_only_reason}</small>}</div>}</div>
+          <div className="report-photos">{photos.length?photos.map((u,i)=><img key={u} src={u} alt={`Foto laporan ${i+1}`}/>):<div className="photo-placeholder">{photosLoading?<LoadingIndicator compact label="Memuat foto…"/>:data.media.length?'Foto belum tersedia':'Tanpa foto'}{r.text_only_reason&&<small>Alasan: {r.text_only_reason}</small>}</div>}</div>
           <dl className="report-facts"><dt>Jenis</dt><dd>{categoryLabel(r.category)}</dd><dt>Lokasi</dt><dd>Sel {data.cell.code} · {r.lat.toFixed(5)}, {r.lon.toFixed(5)} · {r.location_method==='gps'?`GPS ±${Math.round(r.accuracy_m??0)} m`:'diisi manual'}</dd><dt>Catatan nelayan</dt><dd>{r.description}</dd><dt>Pelapor</dt><dd>Disembunyikan. Petugas hanya melihat lokasi, foto, dan catatan.</dd></dl>
         </div>
         <div className="panel">
@@ -141,7 +142,7 @@ export function IndicationDetail({id}:{id:string}){
   const {cells,followUps,error:listError}=useReviewData(),[item,setItem]=useState<FullObservation|null>(null),[error,setError]=useState(''),[saved,setSaved]=useState<FollowUp|null>(null);
   useEffect(()=>{api(`observations/${id}`).then(x=>setItem(x.item)).catch(e=>setError((e as Error).message));},[id]);
   if(error||listError)return <section className="page review-page"><a href="/government/reports">← Laporan masuk</a><AccessError message={error||listError}/></section>;
-  if(!item)return <section className="page review-page"><p role="status">Memuat indikasi…</p></section>;
+  if(!item)return <section className="page review-page"><LoadingIndicator label="Memuat indikasi…"/></section>;
   const cell=problemCell(item.lon,item.lat),reports=cells.get(cell.key)?.reports||[],s=satelliteSignal(item),assessment=saved||followUps[id];
   return <section className="page review-page">
     <a href="/government/reports">← Laporan masuk</a>
